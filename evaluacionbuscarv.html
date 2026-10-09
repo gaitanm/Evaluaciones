@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación DUA: Función BUSCARV</title>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- html2pdf.js para el reporte -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Tailwind CSS para UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        institucional: {
+                            verde: '#39A900',
+                            azul: '#00304D',
+                            morado: '#71277A',
+                            verdeOscuro: '#007832',
+                            verdeGris: '#385C57'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .grid-cell { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ccc; text-transform: uppercase; font-weight: bold; cursor: pointer; user-select: none; }
+        .grid-cell.empty { background-color: transparent; border: none; cursor: default; }
+        .grid-cell.word { background-color: white; }
+        .grid-cell.selected { background-color: #71277A; color: white; border-color: #71277A; }
+        .grid-cell.found { background-color: #39A900; color: white; border-color: #39A900; }
+        .sopa-cell { width: 25px; height: 25px; font-size: 14px; }
+        .number-badge { position: absolute; font-size: 8px; top: 1px; left: 1px; color: #00304D; z-index: 10; font-weight: normal; }
+        .crossword-container { position: relative; display: inline-block; }
+        .readonly-char { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #333; }
+        @media print { body { -webkit-print-color-adjust: exact; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ================= DATOS DE APRENDICES =================
+        const baseAprendices = [
+            { id: 7752813, nombres: "Silmar Eileen", apellidos: "Roman Machacon", ficha: "3534163" },
+            { id: 52979355, nombres: "Viviana", apellidos: "Navarro", ficha: "3534163" },
+            { id: 1000604707, nombres: "Yuly Mallerly", apellidos: "Franco Lemos", ficha: "3534163" },
+            { id: 1005912639, nombres: "Nayely Alejandra", apellidos: "Escobar Acosta", ficha: "3534163" },
+            { id: 1010191182, nombres: "Mariam Valery", apellidos: "Davila Plazas", ficha: "3534163" },
+            { id: 1012349654, nombres: "Luisa Fernada", apellidos: "Buitrago Montaña", ficha: "3534163" },
+            { id: 1012413334, nombres: "Angie Paola", apellidos: "Esteban Castillo", ficha: "3534163" },
+            { id: 1013104803, nombres: "Brayan Alejandro", apellidos: "Patiño Mesa", ficha: "3534163" },
+            { id: 1013122145, nombres: "Diana Geraldyn", apellidos: "Rivera Espinosa", ficha: "3534163" },
+            { id: 1014659462, nombres: "Olver Fabian", apellidos: "Tapiero Alejo", ficha: "3534163" },
+            { id: 1019118516, nombres: "Milton Eduardo", apellidos: "Garzon Ramirez", ficha: "3534163" },
+            { id: 1023379932, nombres: "Nikol Cristhell", apellidos: "Godoy", ficha: "3534163" },
+            { id: 1026258694, nombres: "Nayive Katherine", apellidos: "Rocha Quitian", ficha: "3534163" },
+            { id: 1026564722, nombres: "Taima", apellidos: "Piedrahita Rodriguez", ficha: "3534163" },
+            { id: 1030575549, nombres: "Laura Sofia", apellidos: "Cuervo Jimenez", ficha: "3534163" },
+            { id: 1031644362, nombres: "Juan Camilo", apellidos: "Camacho Gonzalez", ficha: "3534163" },
+            { id: 1073678869, nombres: "Yessenia Alejandra", apellidos: "Martinez", ficha: "3534163" },
+            { id: 1073702147, nombres: "Karol Lyzeth", apellidos: "Forero Araque", ficha: "3534163" },
+            { id: 1074527364, nombres: "Laura Catalina", apellidos: "Diaz Rozo", ficha: "3534163" },
+            { id: 1074527389, nombres: "Loren Yurley", apellidos: "Serna Niño", ficha: "3534163" },
+            { id: 1094960094, nombres: "Juan David", apellidos: "Velasquez Niño", ficha: "3534163" }
+        ];
+
+        // ================= BANCOS DE DATOS =================
+        const bancoConceptos = [
+            {word: "BUSCARV", clue: "Función para buscar y obtener información específica dentro de un rango o tabla."},
+            {word: "VLOOKUP", clue: "Nombre en inglés de la función de búsqueda vertical."},
+            {word: "MATRIZ", clue: "Conjunto relacionado de datos conocido como tabla de búsqueda."},
+            {word: "FILA", clue: "Elemento donde la función devuelve el valor correspondiente tras hallar una coincidencia."},
+            {word: "COLUMNA", clue: "Lugar donde se debe ubicar siempre el valor buscado (la primera)."},
+            {word: "AUTOMATIZACION", clue: "Beneficio de la función que ahorra tiempo y reduce margen de error."},
+            {word: "CUATRO", clue: "Cantidad de parámetros que intervienen en la sintaxis de la función."},
+            {word: "VALORBUSCADO", clue: "Primer parámetro de la función, ubicado siempre en la primera columna."},
+            {word: "MATRIZTABLA", clue: "Segundo parámetro que representa el rango que contiene los datos."},
+            {word: "INDICADOR", clue: "Tercer argumento que especifica la posición de donde se extraerá el valor."},
+            {word: "RANGO", clue: "Último parámetro de la función, es de carácter opcional."},
+            {word: "VERDADERO", clue: "Valor lógico que indica una coincidencia aproximada."},
+            {word: "FALSO", clue: "Valor lógico que indica una coincidencia exacta."},
+            {word: "REFERENCIA", clue: "Tipo de dato que puede ser el valor buscado, por ejemplo la celda A2."},
+            {word: "RECTANGULAR", clue: "Forma que debe tener el rango continuo de la matriz tabla."},
+            {word: "RELATIVA", clue: "Posición de la columna especificada en el indicador de columnas."},
+            {word: "EXACTA", clue: "Tipo de coincidencia donde se compara si el valor es exactamente igual al buscado."},
+            {word: "ERROR", clue: "Resultado que arroja la función si no encuentra coincidencia."},
+            {word: "DUPLICADOS", clue: "Si existen estos valores, la función solo devuelve la primera coincidencia."},
+            {word: "APROXIMADA", clue: "Coincidencia útil para encontrar el valor más cercano a un valor dado."},
+            {word: "ORDENADOS", clue: "Requisito de los datos en la columna de búsqueda para coincidencia aproximada."},
+            {word: "MENOR", clue: "El valor buscado en coincidencia aproximada no puede ser esto respecto al mínimo."},
+            {word: "MAYOR", clue: "Condición donde el valor buscado es igual o superior al valor en la fila actual."},
+            {word: "CERCANO", clue: "La búsqueda aproximada encuentra este tipo de valor respecto al dado."},
+            {word: "ND", clue: "Error común que indica que el valor buscado no se encuentra."},
+            {word: "NEGATIVO", clue: "Causante de error cuando el indicador de columnas tiene este tipo de valor."},
+            {word: "TEXTO", clue: "Tipo de dato que puede generar error si se busca en un rango numérico."},
+            {word: "REF", clue: "Error que ocurre si se hace referencia a una columna fuera del rango."},
+            {word: "BORRAR", clue: "Acción sobre una columna que puede desencadenar un error de referencia."},
+            {word: "VALOR", clue: "Error cuando los argumentos no son coherentes o se omite alguno."},
+            {word: "NOMBRE", clue: "Error por especificar un rango inadecuadamente (ej: A:F6)."},
+            {word: "ORGANIZAR", clue: "Recomendación para mantener la columna de búsqueda como la primera."},
+            {word: "TIPOS", clue: "Se deben verificar que el valor buscado y la columna sean del mismo."},
+            {word: "ABSOLUTAS", clue: "Referencias recomendadas para la matriz si la fórmula se va a copiar."},
+            {word: "AJUSTE", clue: "Acción automática al usar referencias absolutas cuando se mueve una fórmula."},
+            {word: "IZQUIERDA", clue: "Dirección hacia la cual la función no puede devolver valores."},
+            {word: "IGNORADOS", clue: "Destino de las coincidencias adicionales cuando existen valores duplicados."},
+            {word: "ASCENDENTE", clue: "Orden indispensable de la columna de búsqueda para coincidencias aproximadas."},
+            {word: "ESTRUCTURA", clue: "Cambios aquí en la tabla pueden provocar errores en los resultados."},
+            {word: "VALIDAR", clue: "Acción requerida usando otras funciones, pues no se manejan errores nativamente."},
+            {word: "FINANCIERA", clue: "Tipo de información cuya consolidación requiere la función de búsqueda."},
+            {word: "INVENTARIOS", clue: "Gestión de productos que se beneficia del uso de búsquedas verticales."},
+            {word: "LOGICO", clue: "Tipo de valor admitido por el parámetro opcional (VERDADERO/FALSO)."},
+            {word: "DIALOGO", clue: "Cuadro de Excel que permite insertar y configurar los parámetros."},
+            {word: "SINTAXIS", clue: "Estructura u orden de los cuatro parámetros que componen la función."}
+        ];
+
+        // 60 Preguntas Base para el Test - Totalmente únicas y conceptualmente distintas
+        const bancoTestBase = [
+            { q: "¿A qué categoría de funciones pertenece BUSCARV?", a: "Funciones de búsqueda y referencia", w: ["Funciones lógicas", "Funciones matemáticas", "Funciones de texto"] },
+            { q: "¿Cuál es el nombre en inglés de la función BUSCARV?", a: "VLOOKUP", w: ["HLOOKUP", "SEARCH", "FIND"] },
+            { q: "¿Qué hace principalmente la función BUSCARV?", a: "Busca un valor en la primera columna y devuelve un valor en la misma fila", w: ["Suma los valores de una tabla", "Busca un valor en la primera fila", "Filtra los datos repetidos"] },
+            { q: "¿Cuántos parámetros intervienen en la sintaxis de BUSCARV?", a: "Cuatro", w: ["Tres", "Dos", "Cinco"] },
+            { q: "¿Cuál es el primer parámetro de la función BUSCARV?", a: "Valor_buscado", w: ["Matriz_tabla", "Indicador_columnas", "Rango"] },
+            { q: "¿Dónde debe estar ubicado SIEMPRE el Valor_buscado?", a: "En la primera columna del rango de búsqueda", w: ["En la última columna", "En la primera fila", "En cualquier columna"] },
+            { q: "¿Qué tipo de dato NO puede ser el Valor_buscado?", a: "Una matriz completa", w: ["Un valor de texto", "Un número", "La referencia a una celda"] },
+            { q: "¿Qué representa el parámetro Matriz_tabla?", a: "El rango o tabla que contiene los datos donde se realizará la búsqueda", w: ["El número de columnas a buscar", "El valor exacto a encontrar", "El criterio lógico de ordenamiento"] },
+            { q: "¿Qué condición geométrica debe cumplir el rango Matriz_tabla?", a: "Debe ser un rango continuo y rectangular", w: ["Debe ser una sola columna", "Debe incluir celdas combinadas", "Debe estar en formato de tabla dinámica"] },
+            { q: "¿Qué indica el parámetro Indicador_columnas?", a: "El número de columna desde la cual se extraerá el valor deseado", w: ["La letra de la columna en Excel", "La cantidad de filas de la matriz", "El número de resultados a mostrar"] },
+            { q: "Si el rango de búsqueda es A3:E22, ¿qué número corresponde a la columna C?", a: "3", w: ["C", "1", "4"] },
+            { q: "¿Cuál de los cuatro parámetros de BUSCARV es opcional?", a: "Rango", w: ["Valor_buscado", "Matriz_tabla", "Indicador_columnas"] },
+            { q: "¿Qué valor lógico se usa en el argumento Rango para una coincidencia exacta?", a: "FALSO", w: ["VERDADERO", "SI", "NO"] },
+            { q: "¿Qué valor asume Excel si se omite el último parámetro (Rango)?", a: "VERDADERO (Coincidencia aproximada)", w: ["FALSO (Coincidencia exacta)", "0", "Marca un error"] },
+            { q: "¿Qué devuelve BUSCARV si no encuentra una coincidencia exacta tras recorrer todo el rango?", a: "El error #N/D", w: ["El valor más cercano", "La celda en blanco", "El error #¡VALOR!"] },
+            { q: "Si en la columna de búsqueda hay valores duplicados, ¿qué devuelve BUSCARV con coincidencia exacta?", a: "El resultado de la primera coincidencia que encuentre", w: ["El resultado de la última coincidencia", "La suma de las coincidencias", "Un error"] },
+            { q: "Para una coincidencia aproximada, ¿cómo deben estar ordenados los datos en la columna de búsqueda?", a: "De menor a mayor", w: ["De mayor a menor", "En orden alfabético estricto", "No requieren ordenamiento"] },
+            { q: "En coincidencia aproximada, ¿qué pasa si el Valor_buscado es menor que el valor más pequeño de la columna?", a: "Retorna el error #N/D", w: ["Devuelve el valor mínimo", "Devuelve cero", "Devuelve la primera celda"] },
+            { q: "En coincidencia aproximada, ¿cuándo se considera que hay una coincidencia inicial?", a: "Cuando el Valor_buscado es igual o mayor al valor en la fila actual", w: ["Cuando es estrictamente menor", "Cuando coincide en texto y formato", "Cuando la celda está vacía"] },
+            { q: "En coincidencia aproximada, ¿qué devuelve la función si se recorren todas las filas sin hallar límite superior?", a: "El valor correspondiente a la última fila de la matriz", w: ["Error #¡REF!", "El promedio de los valores", "Cero"] },
+            { q: "¿Para qué escenario es ideal utilizar BUSCARV con coincidencia aproximada?", a: "Para encontrar un valor que se encuentra dentro de un rango numérico", w: ["Para buscar nombres de personas", "Para buscar códigos únicos de producto", "Para consolidar textos exactos"] },
+            { q: "¿Qué indica el error #¡REF! al usar BUSCARV?", a: "Se hace referencia a una columna fuera del rango de la tabla", w: ["El valor buscado no existe", "Los tipos de datos no coinciden", "La función está mal escrita"] },
+            { q: "¿En qué caso específico se puede generar el error #¡REF!?", a: "Al borrar una columna usada en la fórmula", w: ["Al ordenar mal la matriz", "Al omitir el argumento Rango", "Al escribir el valor buscado en comillas"] },
+            { q: "¿Cuándo ocurre el error #¡VALOR! en BUSCARV?", a: "Cuando los argumentos de la función no son coherentes o se omite alguno", w: ["Cuando el valor no se encuentra", "Cuando la columna es de texto", "Cuando se divide por cero"] },
+            { q: "¿Qué error se presenta si se especifica un rango de manera inadecuada (ej: A:F6)?", a: "#¿NOMBRE?", w: ["#N/D", "#¡REF!", "#¡DIV/0!"] },
+            { q: "¿Qué sucede si en Indicador_columnas se suministra un valor no numérico?", a: "Se genera el error #¿NOMBRE?", w: ["La función asume la columna 1", "Se genera el error #N/D", "El programa se bloquea"] },
+            { q: "¿Por qué se recomienda organizar la tabla antes de usar BUSCARV?", a: "Para asegurar que la columna de búsqueda sea siempre la primera", w: ["Para que Excel calcule más rápido", "Para evitar celdas vacías", "Para poder usar colores"] },
+            { q: "Al preparar los datos para BUSCARV, ¿qué aspecto es crucial respecto a los tipos de datos?", a: "Que el valor buscado y la columna de búsqueda sean del mismo tipo", w: ["Que todos los datos sean numéricos", "Que los textos estén en mayúscula", "Que no existan fechas"] },
+            { q: "¿Por qué es recomendable usar referencias absolutas en el argumento Matriz_tabla?", a: "Para que la fórmula se ajuste automáticamente al copiarla o moverla", w: ["Para que el resultado sea exacto", "Para evitar que cambie el valor buscado", "Para ocultar la fórmula"] },
+            { q: "¿Cómo se escribe correctamente una referencia absoluta para el rango A2:F6?", a: "$A$2:$F$6", w: ["A$2:F$6", "A2:F6", "&$A&$2:&$F&$6"] },
+            { q: "¿Cuál es la limitante espacial principal de la función BUSCARV?", a: "No puede devolver valores de una columna ubicada a la izquierda de la de búsqueda", w: ["No puede buscar en otras hojas", "Solo puede buscar en las primeras 100 filas", "No puede buscar fechas"] },
+            { q: "¿Qué sucede con las coincidencias múltiples (duplicados) en BUSCARV?", a: "Ignora las demás y solo devuelve la primera", w: ["Suma todos los valores encontrados", "Muestra una advertencia", "Promedia los resultados"] },
+            { q: "¿Qué función complementaria se debe usar ya que BUSCARV no maneja errores nativamente?", a: "Otras funciones de validación de datos (ej. SI.ERROR)", w: ["Función SUMAR.SI", "Función EXTRAE", "Función COINCIDIR"] },
+            { q: "Según el texto, ¿qué proceso financiero se beneficia del uso de BUSCARV?", a: "La consolidación de información financiera", w: ["El cálculo de intereses compuestos", "La proyección de inflación", "El pago de impuestos automáticos"] },
+            { q: "Además de finanzas, ¿qué otra área de gestión se menciona como beneficiaria de la función?", a: "La gestión de inventarios", w: ["El diseño gráfico", "La programación web", "El marketing digital"] },
+            { q: "¿Qué problema principal resuelve la automatización mediante BUSCARV?", a: "Recuperar datos automáticamente, ahorrando tiempo y reduciendo el margen de error", w: ["Mejorar el diseño de las tablas", "Crear gráficos 3D", "Eliminar archivos duplicados"] },
+            { q: "¿Qué tipo de valor es 'A2' cuando se usa como primer parámetro?", a: "La referencia a una celda", w: ["Una cadena de texto", "Un valor numérico directo", "Una matriz"] },
+            { q: "¿Cuál de estas afirmaciones es verdadera sobre el parámetro Rango?", a: "Admite un valor lógico: VERDADERO o FALSO", w: ["Admite rangos de celdas como A1:B2", "Debe ser siempre un número entero", "Es obligatorio en todos los casos"] },
+            { q: "¿Qué hace la función si el Indicador_columnas tiene un valor negativo?", a: "Muestra el error #N/D o #¡VALOR!", w: ["Busca hacia la izquierda", "Busca desde abajo hacia arriba", "Invierte el orden de los datos"] },
+            { q: "Si se usa la herramienta 'Insertar función', ¿qué opción no aparece por defecto?", a: "El autocompletado de la sintaxis en la celda directamente", w: ["El cuadro de diálogo de argumentos", "La descripción de la función", "El resultado previo de la fórmula"] },
+            { q: "En el ejemplo del texto, ¿qué valor se obtuvo al buscar el ID 103?", a: "$350,000.00", w: ["$4,200,000.00", "12", "Electro Hogar"] },
+            { q: "En el ejemplo del texto, ¿qué columna contenía el dato 'Vr. Unidad'?", a: "La columna 4", w: ["La columna 2", "La columna 6", "La columna A"] },
+            { q: "Si la fórmula es =BUSCARV(105, A2:F6, 6, FALSO), ¿qué tipo de dato está recuperando del ejemplo?", a: "El Proveedor", w: ["El Nombre del Producto", "La Categoría", "El Stock"] },
+            { q: "¿Qué ocurre físicamente en Excel cuando BUSCARV con coincidencia exacta revisa la tabla?", a: "Comienza en la primera fila, compara, y si no coincide pasa a la siguiente", w: ["Revisa todas las columnas al mismo tiempo", "Busca primero en la última fila", "Filtra la tabla ocultando los datos"] },
+            { q: "¿Por qué no se usa con tanta frecuencia la coincidencia aproximada?", a: "Debido a cómo funciona y a sus restricciones de ordenamiento", w: ["Porque es más lenta de procesar", "Porque solo funciona con textos", "Porque requiere otra suscripción de Office"] },
+            { q: "En el ejemplo de coincidencia aproximada, ¿qué valor se usaba para la experiencia de 9.50 años?", a: "$200,000.00", w: ["$100,000.00", "$300,000.00", "$0.00"] },
+            { q: "Según la lógica mostrada, si la experiencia es 4 exacto, ¿qué bonificación recibe?", a: "$100,000.00", w: ["$0.00", "$200,000.00", "$300,000.00"] },
+            { q: "¿Qué inecuación evalúa Excel internamente al buscar 9.50 en la tabla de rangos?", a: "8 <= 9.50 < 12", w: ["9.50 = 8", "9.50 > 12", "4 <= 9.50 < 8"] },
+            { q: "¿Qué error se genera si hay discrepancia entre los tipos de datos (ej. buscar número en texto)?", a: "#N/D", w: ["#¡NUM!", "#¡NULO!", "#¿NOMBRE?"] },
+            { q: "¿Qué parámetro de la sintaxis debe corresponder a la posición relativa, no absoluta?", a: "El Indicador_columnas", w: ["El Valor_buscado", "La Matriz_tabla", "El Rango"] },
+            { q: "Si el rango es D10:H20, ¿qué número en Indicador_columnas extrae el dato de la columna F?", a: "3", w: ["F", "6", "2"] },
+            { q: "¿Qué efecto tiene cualquier cambio estructural en la tabla de búsqueda (como insertar columnas)?", a: "Puede provocar errores en los resultados de la función", w: ["Actualiza automáticamente la fórmula de BUSCARV", "No afecta en absoluto", "Cambia el nombre de la función"] },
+            { q: "¿Cómo asume Excel la tabla de forma predeterminada según la herramienta Insertar Función?", a: "Ordenada de forma ascendente", w: ["Ordenada por fechas", "Desordenada", "Ordenada de forma descendente"] },
+            { q: "¿Cuál de estos NO es un valor admitido para el parámetro Valor_buscado?", a: "Un gráfico de Excel", w: ["Una cadena de texto", "Un número", "Una expresión"] },
+            { q: "En el algoritmo de búsqueda aproximada, si el valor actual es mayor al buscado, ¿qué hace?", a: "Retorna el valor de la fila anterior", w: ["Sigue buscando abajo", "Genera un error", "Reinicia la búsqueda"] },
+            { q: "¿Qué celda se usa como Valor_buscado en la fórmula =BUSCARV(D14, A2:F6, 4, FALSO)?", a: "D14", w: ["A2", "F6", "4"] },
+            { q: "¿Qué significa que un rango sea 'continuo' en la Matriz_tabla?", a: "Que no debe tener interrupciones de columnas separadas en la referencia", w: ["Que debe durar para siempre", "Que no puede tener celdas vacías internamente", "Que debe tener el mismo color"] },
+            { q: "Si la columna de búsqueda no es la primera del rango especificado, ¿qué ocurre?", a: "La función no trabajará de manera adecuada", w: ["La función la mueve automáticamente", "Excel avisa con un mensaje pop-up", "Calcula el resultado al revés"] },
+            { q: "En el ejemplo de empleados, ¿qué cargo tiene el empleado de cédula 104006?", a: "Vendedor", w: ["Operador", "Auxiliar", "Profesional"] },
+            { q: "¿Qué símbolo en una fórmula de Excel indica que la referencia es absoluta?", a: "El símbolo de dólar ($)", w: ["El símbolo de porcentaje (%)", "El símbolo de numeral (#)", "El símbolo de ampersand (&)"] }
+        ];
+
+        // ================= UTILIDADES =================
+        
+        // Función estricta de barajado Fisher-Yates para garantizar 100% de aleatoriedad (Anti-Timsort)
+        const shuffleArray = (array) => {
+            let result = [...array];
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        };
+
+        // Generador de Crucigrama 2D
+        const generarCrucigrama = (palabras) => {
+            palabras.sort((a, b) => b.word.length - a.word.length);
+            let grid = Array(30).fill(null).map(() => Array(30).fill(null));
+            let placed = [];
+            let horizCount = 0;
+            let vertCount = 0;
+
+            const placeFirst = (wordObj) => {
+                const w = wordObj.word;
+                const startX = 15 - Math.floor(w.length / 2);
+                const startY = 15;
+                for (let i = 0; i < w.length; i++) {
+                    grid[startY][startX + i] = { char: w[i] };
+                }
+                grid[startY][startX].num = 1;
+                grid[startY][startX].dir = 'H';
+                
+                placed.push({ ...wordObj, num: 1, x: startX, y: startY, dir: 'H' });
+                horizCount++;
+            };
+
+            const canPlace = (w, r, c, dir) => {
+                if (dir === 'H') {
+                    if (c + w.length > 30) return false;
+                    for (let i = 0; i < w.length; i++) {
+                        if (grid[r][c + i] && grid[r][c + i].char !== w[i]) return false;
+                        if (!grid[r][c + i]) {
+                            if (r > 0 && grid[r-1][c+i]) return false;
+                            if (r < 29 && grid[r+1][c+i]) return false;
+                        }
+                    }
+                    if (c > 0 && grid[r][c-1]) return false;
+                    if (c + w.length < 30 && grid[r][c+w.length]) return false;
+                } else {
+                    if (r + w.length > 30) return false;
+                    for (let i = 0; i < w.length; i++) {
+                        if (grid[r + i][c] && grid[r + i][c].char !== w[i]) return false;
+                        if (!grid[r + i][c]) {
+                            if (c > 0 && grid[r+i][c-1]) return false;
+                            if (c < 29 && grid[r+i][c+1]) return false;
+                        }
+                    }
+                    if (r > 0 && grid[r-1][c]) return false;
+                    if (r + w.length < 30 && grid[r+w.length][c]) return false;
+                }
+                return true;
+            };
+
+            if (palabras.length > 0) placeFirst(palabras[0]);
+
+            let counter = 2;
+            for (let i = 1; i < palabras.length; i++) {
+                const w = palabras[i].word;
+                let isPlaced = false;
+                
+                let preferDir = null;
+                if (i > 8) {
+                    if (horizCount < 6) preferDir = 'H';
+                    if (vertCount < 6) preferDir = 'V';
+                }
+
+                for (let p of placed) {
+                    if (isPlaced) break;
+                    for (let j = 0; j < p.word.length; j++) {
+                        if (isPlaced) break;
+                        const char = p.word[j];
+                        const matchIdx = w.indexOf(char);
+                        if (matchIdx !== -1) {
+                            const tryDir = p.dir === 'H' ? 'V' : 'H';
+                            if (preferDir && tryDir !== preferDir && (horizCount + vertCount < 14)) continue;
+                            
+                            const startR = p.dir === 'H' ? p.y - matchIdx : p.y + j;
+                            const startC = p.dir === 'H' ? p.x + j : p.x - matchIdx;
+                            
+                            if (startR >= 0 && startC >= 0 && canPlace(w, startR, startC, tryDir)) {
+                                for (let k = 0; k < w.length; k++) {
+                                    const r = tryDir === 'V' ? startR + k : startR;
+                                    const c = tryDir === 'H' ? startC + k : startC;
+                                    if (!grid[r][c]) grid[r][c] = { char: w[k], shared: true };
+                                }
+                                grid[startR][startC].num = counter;
+                                placed.push({ ...palabras[i], num: counter, x: startC, y: startR, dir: tryDir });
+                                tryDir === 'H' ? horizCount++ : vertCount++;
+                                isPlaced = true;
+                                counter++;
+                            }
+                        }
+                    }
+                }
+                
+                if (!isPlaced) {
+                    let dir = preferDir || (Math.random() > 0.5 ? 'H' : 'V');
+                    outer: for(let r=2; r<28; r+=2) {
+                        for(let c=2; c<28; c+=2) {
+                            if (canPlace(w, r, c, dir)) {
+                                for (let k = 0; k < w.length; k++) {
+                                    if(dir === 'H') grid[r][c+k] = { char: w[k] };
+                                    else grid[r+k][c] = { char: w[k] };
+                                }
+                                grid[r][c].num = counter;
+                                placed.push({ ...palabras[i], num: counter, x: c, y: r, dir: dir });
+                                dir === 'H' ? horizCount++ : vertCount++;
+                                isPlaced = true;
+                                counter++;
+                                break outer;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            let minR=30, maxR=0, minC=30, maxC=0;
+            for(let r=0; r<30; r++){
+                for(let c=0; c<30; c++){
+                    if(grid[r][c]){
+                        if(r<minR) minR=r; if(r>maxR) maxR=r;
+                        if(c<minC) minC=c; if(c>maxC) maxC=c;
+                    }
+                }
+            }
+            
+            const trimmedGrid = grid.slice(minR, maxR+1).map(row => row.slice(minC, maxC+1));
+            const adjustedPlaced = placed.map(p => ({...p, x: p.x - minC, y: p.y - minR}));
+            
+            return { grid: trimmedGrid, palabras: adjustedPlaced };
+        };
+
+        const generarSopa = (palabras) => {
+            const size = 18;
+            let grid = Array(size).fill(null).map(() => Array(size).fill(''));
+            let placedInfo = [];
+            const dirs = [[0,1], [1,0]]; 
+            
+            for(let p of palabras) {
+                const w = p.word;
+                let placed = false;
+                let attempts = 0;
+                while(!placed && attempts < 100) {
+                    attempts++;
+                    const d = dirs[Math.floor(Math.random() * dirs.length)];
+                    const r = Math.floor(Math.random() * size);
+                    const c = Math.floor(Math.random() * size);
+                    
+                    if (r + d[0]*w.length <= size && c + d[1]*w.length <= size) {
+                        let can = true;
+                        for(let i=0; i<w.length; i++) {
+                            const char = grid[r + d[0]*i][c + d[1]*i];
+                            if(char !== '' && char !== w[i]) { can = false; break; }
+                        }
+                        if(can) {
+                            for(let i=0; i<w.length; i++) {
+                                grid[r + d[0]*i][c + d[1]*i] = w[i];
+                            }
+                            placedInfo.push({word: w, start: [r,c], dir: d});
+                            placed = true;
+                        }
+                    }
+                }
+            }
+            
+            const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for(let r=0; r<size; r++) {
+                for(let c=0; c<size; c++) {
+                    if(grid[r][c] === '') grid[r][c] = letras[Math.floor(Math.random()*letras.length)];
+                }
+            }
+            return { grid, placedInfo };
+        };
+
+        const generarRetos = () => {
+            const banco = [];
+            const hojas = ["Datos", "Reportes", "Base", "Consolidado", "Liquidacion", ""]; 
+            const tiposCoincidencia = [
+                { desc: "coincidencia exacta", val: "FALSO" },
+                { desc: "coincidencia aproximada", val: "VERDADERO" },
+                { desc: "coincidencia exacta (usando 0)", val: "0" },
+                { desc: "coincidencia aproximada (usando 1)", val: "1" }
+            ];
+            
+            for (let e = 0; e < 60; e++) {
+                const asciiStart = 65 + (e % 15);
+                const startColChar = String.fromCharCode(asciiStart > 90 ? 90 : asciiStart);
+                const asciiEnd = asciiStart + 3 + (e % 6);
+                const endColChar = String.fromCharCode(asciiEnd > 90 ? 90 : asciiEnd);
+                const startRow = (e * 4) + (e % 3 === 0 ? 2 : 5);
+                const endRow = startRow + 40 + (e * 5);
+                
+                const rangoTexto = `${startColChar}${startRow}:${endColChar}${endRow}`;
+                const rangoAbs = `$${startColChar}$${startRow}:$${endColChar}$${endRow}`;
+                
+                const hoja = hojas[e % hojas.length];
+                const refMatriz = hoja !== "" ? `${hoja}!${rangoAbs}` : rangoAbs;
+                const refMatrizAlt = hoja !== "" ? `'${hoja}'!${rangoAbs}` : rangoAbs;
+                
+                const celda = `${String.fromCharCode(65 + (e % 3))}${(e % 20) + 2}`;
+                
+                const numCols = endColChar.charCodeAt(0) - startColChar.charCodeAt(0) + 1;
+                const col = (e % (numCols - 1)) + 2; 
+                const tipo = tiposCoincidencia[e % 4];
+                
+                let descripcion = "";
+                if (hoja !== "") {
+                    const plantillas = [
+                        `Extraiga el dato de la columna ${col} para el valor ubicado en la celda ${celda} dentro del rango ${rangoTexto}, ubicado en la hoja '${hoja}'. Use ${tipo.desc} y fije la matriz de búsqueda con referencias absolutas.`,
+                        `Obtenga la información de la columna ${col} correspondiente al valor de la celda ${celda}. La tabla de datos se encuentra en el rango ${rangoTexto} de la hoja '${hoja}'. Se requiere ${tipo.desc} implementando referencias absolutas.`,
+                        `Localice el valor de la celda ${celda} en el rango ${rangoTexto} (ubicado en la hoja '${hoja}') y devuelva el dato de la columna ${col}. Emplee ${tipo.desc} y asegure el rango con referencias absolutas.`
+                    ];
+                    descripcion = plantillas[e % 3];
+                } else {
+                    const plantillas = [
+                        `Extraiga el dato de la columna ${col} para el valor ubicado en la celda ${celda} dentro del rango ${rangoTexto} en esta misma hoja. Use ${tipo.desc}, fijando el rango con referencias absolutas.`,
+                        `Busque el valor de la celda ${celda} en el rango ${rangoTexto} (ubicado en la hoja actual) y devuelva el dato de la columna ${col}. Emplee ${tipo.desc} usando referencias absolutas.`,
+                        `Localice el contenido de la celda ${celda} dentro del rango ${rangoTexto} de la hoja activa, extrayendo el valor de la columna ${col}. Utilice ${tipo.desc} y fije la matriz de búsqueda.`
+                    ];
+                    descripcion = plantillas[e % 3];
+                }
+                
+                banco.push({
+                    id: e + 1,
+                    descripcion: descripcion,
+                    solucion: `=BUSCARV(${celda};${refMatriz};${col};${tipo.val})`,
+                    solucionAlt: `=BUSCARV(${celda};${refMatrizAlt};${col};${tipo.val})`
+                });
+            }
+            return banco;
+        };
+
+        // ================= COMPONENTES REACT =================
+
+        const Logo = () => (
+            <div className="w-32 h-32 mx-auto mb-4" dangerouslySetInnerHTML={{__html: `<?xml version="1.0" encoding="utf-8"?><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 50 50" style="enable-background:new 0 0 50 50;" xml:space="preserve"><style type="text/css">.st0{fill-rule:evenodd;clip-rule:evenodd;fill:#39A900;}</style><g transform="translate(-101.671 -608.712)"><g transform="translate(101.671 608.712)"><path class="st0" d="M25.2,0.8c-3,0-5.4,2.4-5.4,5.4c0,3,2.4,5.4,5.4,5.4c3,0,5.4-2.4,5.4-5.4C30.6,3.2,28.2,0.8,25.2,0.8 C25.2,0.8,25.2,0.8,25.2,0.8z M32.2,13.3l0,5l-4.4-5h-4.1v7.3h3l0-4.8l4.2,4.8l4.2,0l0-7.3L32.2,13.3L32.2,13.3z M13.6,13.3 L13.6,13.3l-0.1,7.3l8.8,0l0-1.6l-5.6,0l0-1.4l5,0V16l-4.9,0.1V15l5.3,0l0-1.6L13.6,13.3L13.6,13.3z M44,13.3h-3.5l-5,7.3h3.2 l0.8-1.4l5.1,0l0.8,1.4h3.4L44,13.3z M7.7,13.3H7.1c-0.6,0-1.1,0-1.7,0.1c-0.7,0.1-1.4,0.3-2,0.6c-0.6,0.2-1,0.8-1,1.4 c0,0.3,0,0.5,0.2,0.8c0.1,0.1,0.1,0.2,0.2,0.3c0.5,0.4,1,0.7,1.7,0.8c0.8,0.2,1.6,0.4,2.4,0.5c0.5,0.1,1,0.2,1.5,0.3 c0.2,0.1,0.4,0.2,0.6,0.3c0.1,0.1,0.1,0.3,0,0.4c0,0,0,0,0,0C8.6,19,8.3,19.1,8,19.1c-0.5,0-1,0-1.5,0c-0.6-0.1-0.9-0.3-1-0.6 c0-0.1,0-0.2,0-0.2l0-0.2l-0.2,0c-0.1,0-0.8,0-1.6,0l-1.3,0v0.1c0,0.2,0,0.4,0.1,0.5c0.2,0.8,0.8,1.3,1.9,1.6 c0.5,0.1,1,0.2,1.5,0.2c0.5,0,1.5,0,2.1,0c2.3-0.1,3.8-0.6,4.3-1.5c0.1-0.2,0.2-0.5,0.2-0.7c0-0.3-0.1-0.6-0.3-0.9 c-0.3-0.4-0.7-0.7-1.2-0.8c-0.8-0.3-1.6-0.5-2.5-0.6c-0.7-0.1-1.4-0.2-2-0.4c-0.2-0.1-0.4-0.2-0.6-0.3c0-0.1,0-0.2,0-0.2 c0.1-0.2,0.5-0.3,1-0.4c0.4,0,0.8,0,1.2,0c0.3,0,0.6,0.1,0.8,0.3c0.1,0.1,0.1,0.2,0.2,0.3c0,0.1,0,0.1,0.1,0.1c0,0,0.7,0,1.5,0 l1.5,0l0-0.1c0-0.2,0-0.3-0.1-0.5c-0.2-0.8-1.1-1.3-2.7-1.5C8.7,13.3,8.2,13.3,7.7,13.3L7.7,13.3z M42,15.1l1.6,2.6l-3.2,0 L42,15.1z M23.2,22.1L0,22.2V26h7.5c7.2,0,7.5,0,7.7,0.1c0.3,0.2,0.5,0.5,0.5,0.8c0.1,0.6,0.2,0-5.6,10l-3.4,5.9l2.8,2.6 L23.2,22.1L23.2,22.1z M26.8,22.2l13.8,23.2l2.8-2.6l-3.5-5.9c-5.8-9.9-5.7-9.4-5.6-10c0-0.3,0.2-0.7,0.5-0.8 C35,26,35.3,26,42.5,26H50v-3.8L26.8,22.2L26.8,22.2z M24.9,26.2L12.4,47.5l3.3,1.5l7.1-12.2l1.2-2.1c0.2-0.3,0.3-0.4,0.9-0.4 c0.4,0,0.7,0.1,0.9,0.4l1.3,2.2l7.3,12.2l3.3-1.9L24.9,26.2L24.9,26.2z"/></g></g></svg>`}} />
+        );
+
+        const App = () => {
+            const [view, setView] = React.useState('login');
+            const [user, setUser] = React.useState(null);
+            const [data, setData] = React.useState(null);
+            
+            const [respuestasCruci, setRespuestasCruci] = React.useState({});
+            const [palabrasSopaEncontradas, setPalabrasSopaEncontradas] = React.useState([]);
+            const [respuestasRetos, setRespuestasRetos] = React.useState({});
+            const [respuestasTest, setRespuestasTest] = React.useState({});
+            
+            const [calificaciones, setCalificaciones] = React.useState({ cruci: 0, sopa: 0, retos: 0, test: 0, total: 0 });
+
+            React.useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    if (view !== 'login' && view !== 'reporte') {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }, [view]);
+
+            const iniciarEvaluacion = (aprendiz) => {
+                setUser(aprendiz);
+                
+                // Generación y extracción aleatoria dinámica con Fisher-Yates por sesión
+                const cruciWords = shuffleArray(bancoConceptos).slice(0, 15);
+                const sopaWords = shuffleArray(bancoConceptos).slice(0, 15);
+                
+                const retosCompletos = generarRetos();
+                const retosSeleccionados = shuffleArray(retosCompletos).slice(0, 15);
+                
+                const testSeleccionado = shuffleArray(bancoTestBase).slice(0, 25).map((q, index) => ({
+                    pregunta: `¿Pregunta conceptual ${index + 1}: ${q.q.replace(/^\¿/, '')}`,
+                    opciones: shuffleArray([q.a, ...q.w]),
+                    correcta: q.a
+                }));
+                
+                setData({
+                    crucigrama: generarCrucigrama(cruciWords),
+                    sopa: generarSopa(sopaWords),
+                    retos: retosSeleccionados,
+                    test: testSeleccionado
+                });
+                setView('crucigrama');
+            };
+
+            const calcularFinal = () => {
+                let cruciHits = 0;
+                data.crucigrama.palabras.forEach(p => {
+                    // Sanitización de entradas del crucigrama (Anti-Cero)
+                    const ans = (respuestasCruci[p.num] || '').trim().toUpperCase();
+                    if (ans === p.word) cruciHits++;
+                });
+                const notaCruci = (cruciHits / 15) * 15;
+
+                const notaSopa = (palabrasSopaEncontradas.length / 15) * 15;
+
+                let retosHits = 0;
+                data.retos.forEach(r => {
+                    const ans = (respuestasRetos[r.id] || '').replace(/\s/g, '').toUpperCase();
+                    if (ans === r.solucion.toUpperCase() || (r.solucionAlt && ans === r.solucionAlt.toUpperCase())) {
+                        retosHits++;
+                    }
+                });
+                const notaRetos = (retosHits / 15) * 35;
+
+                let testHits = 0;
+                data.test.forEach((q, i) => {
+                    if (respuestasTest[i] === q.correcta) testHits++;
+                });
+                const notaTest = (testHits / 25) * 35;
+
+                setCalificaciones({
+                    cruci: notaCruci,
+                    sopa: notaSopa,
+                    retos: notaRetos,
+                    test: notaTest,
+                    total: notaCruci + notaSopa + notaRetos + notaTest
+                });
+                setView('reporte');
+            };
+
+            return (
+                <div className="min-h-screen pb-10">
+                    <header className="bg-institucional-azul text-white p-4 shadow-md text-center">
+                        <h1 className="text-2xl font-bold uppercase tracking-wide">Evaluación DUA - Función BUSCARV</h1>
+                    </header>
+                    <main className="max-w-6xl mx-auto mt-8 bg-white p-6 md:p-10 rounded-lg shadow-lg">
+                        {view === 'login' && <Login onLogin={iniciarEvaluacion} />}
+                        {view === 'crucigrama' && <Crucigrama data={data.crucigrama} rep={respuestasCruci} setRep={setRespuestasCruci} onNext={() => setView('sopa')} />}
+                        {view === 'sopa' && <SopaLetras data={data.sopa} encontradas={palabrasSopaEncontradas} setEncontradas={setPalabrasSopaEncontradas} onNext={() => setView('casos')} />}
+                        {view === 'casos' && <CasosPracticos data={data.retos} rep={respuestasRetos} setRep={setRespuestasRetos} onNext={() => setView('test')} />}
+                        {view === 'test' && <TestTeorico data={data.test} rep={respuestasTest} setRep={setRespuestasTest} onFinish={calcularFinal} />}
+                        {view === 'reporte' && <Reporte user={user} notas={calificaciones} />}
+                    </main>
+                </div>
+            );
+        };
+
+        const Login = ({ onLogin }) => {
+            const [selId, setSelId] = React.useState('');
+            const aprendiz = baseAprendices.find(a => a.id.toString() === selId) || { nombres: '', apellidos: '', ficha: '' };
+
+            return (
+                <div className="max-w-md mx-auto">
+                    <Logo />
+                    <h2 className="text-xl font-bold text-institucional-azul mb-6 text-center">Registro de Aprendiz</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700">Documento de Identidad</label>
+                            <select 
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:border-institucional-verde focus:ring focus:ring-institucional-verde focus:ring-opacity-50"
+                                value={selId} 
+                                onChange={e => setSelId(e.target.value)}
+                            >
+                                <option value="">-- Seleccione su ID --</option>
+                                {baseAprendices.map(a => <option key={a.id} value={a.id}>{a.id}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700">Nombres</label>
+                            <input type="text" readOnly className="mt-1 block w-full rounded-md bg-gray-100 border-gray-300 shadow-sm p-2" value={aprendiz.nombres} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700">Apellidos</label>
+                            <input type="text" readOnly className="mt-1 block w-full rounded-md bg-gray-100 border-gray-300 shadow-sm p-2" value={aprendiz.apellidos} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700">Ficha / Grupo</label>
+                            <input type="text" readOnly className="mt-1 block w-full rounded-md bg-gray-100 border-gray-300 shadow-sm p-2" value={aprendiz.ficha} />
+                        </div>
+                        <button 
+                            disabled={!selId}
+                            onClick={() => onLogin(aprendiz)}
+                            className="w-full bg-institucional-verde hover:bg-institucional-verdeOscuro text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+                        >
+                            Comenzar Evaluación
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const Crucigrama = ({ data, rep, setRep, onNext }) => {
+            const handleInput = (num, val) => {
+                setRep(prev => ({...prev, [num]: val}));
+            };
+
+            // Helpers para mapear el texto escrito en los inputs hacia la cuadrícula de solo lectura
+            const getCellChar = (r, c) => {
+                let char = '';
+                data.palabras.forEach(p => {
+                    const ans = (rep[p.num] || '').trim().toUpperCase();
+                    if (p.dir === 'H' && r === p.y && c >= p.x && c < p.x + p.word.length) {
+                        const idx = c - p.x;
+                        if (ans[idx]) char = ans[idx];
+                    } else if (p.dir === 'V' && c === p.x && r >= p.y && r < p.y + p.word.length) {
+                        const idx = r - p.y;
+                        if (ans[idx]) char = ans[idx];
+                    }
+                });
+                return char;
+            };
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-institucional-morado mb-2">Actividad 1: Crucigrama (15%)</h2>
+                    <p className="mb-6 text-gray-600">El aprendiz debe resolver el crucigrama digitando la palabra completa según la pista numérica en el <strong>panel lateral derecho</strong>. La cuadrícula inferior es de solo lectura.</p>
+                    
+                    <div className="flex flex-col md:flex-row gap-8">
+                        <div className="flex-1 overflow-x-auto bg-gray-50 p-4 rounded-lg shadow-inner">
+                            <div className="crossword-container" style={{ display: 'grid', gridTemplateColumns: `repeat(${data.grid[0].length}, 30px)` }}>
+                                {data.grid.map((row, r) => row.map((cell, c) => (
+                                    <div key={`${r}-${c}`} className={`grid-cell ${cell ? 'word' : 'empty'} relative`}>
+                                        {cell && cell.num && <span className="number-badge">{cell.num}</span>}
+                                        {cell && <span className="readonly-char">{getCellChar(r, c)}</span>}
+                                    </div>
+                                )))}
+                            </div>
+                            <div className="mt-4 text-sm text-gray-500 italic">* Utilice los campos de texto del panel derecho para responder. La grilla se llenará automáticamente.</div>
+                        </div>
+                        <div className="flex-1 space-y-4 max-h-[600px] overflow-y-auto pr-4">
+                            <h3 className="font-bold text-institucional-azul text-lg border-b pb-2">Pistas</h3>
+                            {data.palabras.sort((a,b)=>a.num - b.num).map(p => (
+                                <div key={p.num} className="bg-white p-3 rounded shadow-sm border border-gray-200">
+                                    <label className="block text-sm font-semibold mb-1 text-institucional-verdeGris">
+                                        {p.num}. ({p.dir === 'H' ? 'Horizontal' : 'Vertical'}) {p.clue}
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border-b-2 border-institucional-verde focus:border-institucional-morado outline-none px-2 py-1 uppercase" 
+                                        placeholder={`Palabra de ${p.word.length} letras`}
+                                        value={rep[p.num] || ''}
+                                        onChange={e => handleInput(p.num, e.target.value)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="mt-8 text-right">
+                        <button onClick={onNext} className="bg-institucional-azul hover:bg-institucional-verdeOscuro text-white font-bold py-2 px-8 rounded">Siguiente Actividad →</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const SopaLetras = ({ data, encontradas, setEncontradas, onNext }) => {
+            const [selStart, setSelStart] = React.useState(null);
+
+            const handleCellClick = (r, c) => {
+                if (!selStart) {
+                    setSelStart({r, c});
+                } else {
+                    const r1 = selStart.r, c1 = selStart.c;
+                    const r2 = r, c2 = c;
+                    setSelStart(null);
+                    
+                    if (r1 !== r2 && c1 !== c2) return; 
+                    
+                    const isH = r1 === r2;
+                    const min = isH ? Math.min(c1, c2) : Math.min(r1, r2);
+                    const max = isH ? Math.max(c1, c2) : Math.max(r1, r2);
+                    const len = max - min + 1;
+                    
+                    let formedWord = "";
+                    for(let i=0; i<len; i++){
+                        formedWord += isH ? data.grid[r1][min+i] : data.grid[min+i][c1];
+                    }
+                    
+                    const revWord = formedWord.split('').reverse().join('');
+
+                    const match = data.placedInfo.find(p => (p.word === formedWord || p.word === revWord) && !encontradas.includes(p.word));
+                    
+                    if (match) {
+                        const startMatched = (isH && min === match.start[1]) || (!isH && min === match.start[0]);
+                        if(startMatched){
+                             setEncontradas([...encontradas, match.word]);
+                        }
+                    }
+                }
+            };
+
+            const isHighlighted = (r, c) => {
+                if (selStart && selStart.r === r && selStart.c === c) return 'selected';
+                for (let p of encontradas) {
+                    const info = data.placedInfo.find(i => i.word === p);
+                    if (info) {
+                        const isH = info.dir[1] === 1;
+                        if (isH && r === info.start[0] && c >= info.start[1] && c < info.start[1] + p.length) return 'found';
+                        if (!isH && c === info.start[1] && r >= info.start[0] && r < info.start[0] + p.length) return 'found';
+                    }
+                }
+                return '';
+            };
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-institucional-morado mb-2">Actividad 2: Sopa de Letras (15%)</h2>
+                    <p className="mb-6 text-gray-600">El aprendiz debe utilizar la técnica de "Dos Clics" (clic en inicial, clic en final) para seleccionar las {data.placedInfo.length} palabras ocultas (solo horizontal y vertical, no diagonales, no invertidas).</p>
+                    
+                    <div className="flex flex-col md:flex-row gap-8 items-start">
+                        <div className="bg-white p-4 shadow border border-gray-200 rounded inline-block">
+                            {data.grid.map((row, r) => (
+                                <div key={r} className="flex">
+                                    {row.map((char, c) => (
+                                        <div 
+                                            key={c} 
+                                            onClick={() => handleCellClick(r, c)}
+                                            className={`grid-cell sopa-cell ${isHighlighted(r, c)}`}
+                                        >
+                                            {char}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-institucional-azul text-lg border-b pb-2 mb-4">Palabras a buscar ({encontradas.length}/15)</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {data.placedInfo.map((p, i) => (
+                                    <span key={i} className={`px-3 py-1 rounded text-sm font-semibold border ${encontradas.includes(p.word) ? 'bg-institucional-verde text-white border-institucional-verde' : 'bg-gray-100 text-gray-700 border-gray-300'}`}>
+                                        {p.word}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-8 text-right">
+                        <button onClick={onNext} className="bg-institucional-azul hover:bg-institucional-verdeOscuro text-white font-bold py-2 px-8 rounded">Siguiente Actividad →</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const CasosPracticos = ({ data, rep, setRep, onNext }) => {
+            const handleChange = (id, val) => {
+                if (val.includes(',') && !val.includes(';')) {
+                    alert("⚠️ ADVERTENCIA: La arquitectura del sistema exige el uso estricto del punto y coma (;) como separador de argumentos en Excel, según el estándar del taller.");
+                }
+                setRep({...rep, [id]: val});
+            };
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-institucional-morado mb-2">Actividad 3: Caso Práctico Técnico (35%)</h2>
+                    <p className="mb-6 text-gray-600">El aprendiz debe redactar la fórmula exacta de Excel para dar solución a los 15 escenarios planteados. <strong>Obligatorio:</strong> Utilice el signo igual (=) al inicio y punto y coma (;) como separador.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {data.map((r, i) => (
+                            <div key={r.id} className="bg-gray-50 border-l-4 border-institucional-verde p-4 rounded shadow-sm">
+                                <div className="text-xs font-bold text-institucional-verdeGris uppercase mb-1">Reto de Aplicación {i+1}</div>
+                                <p className="text-sm text-gray-800 mb-3">{r.descripcion}</p>
+                                <input 
+                                    type="text"
+                                    placeholder="Ej: =BUSCARV(A3;Reporte!$B$5:$K$50;4;FALSO)"
+                                    className="w-full border border-gray-300 p-2 rounded focus:ring focus:ring-institucional-verde outline-none font-mono text-sm"
+                                    value={rep[r.id] || ''}
+                                    onChange={e => handleChange(r.id, e.target.value)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-8 text-right">
+                        <button onClick={onNext} className="bg-institucional-azul hover:bg-institucional-verdeOscuro text-white font-bold py-2 px-8 rounded">Siguiente Actividad →</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const TestTeorico = ({ data, rep, setRep, onFinish }) => {
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-institucional-morado mb-2">Actividad 4: Test Teórico (35%)</h2>
+                    <p className="mb-6 text-gray-600">El aprendiz debe seleccionar la respuesta correcta a cada una de las 25 preguntas extraídas al azar del marco teórico.</p>
+                    
+                    <div className="space-y-6">
+                        {data.map((q, i) => (
+                            <div key={i} className="bg-white p-5 border border-gray-200 rounded shadow-sm">
+                                <h3 className="font-bold text-institucional-azul mb-3">{i+1}. {q.pregunta}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {q.opciones.map((opt, j) => (
+                                        <label key={j} className={`flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50 transition-colors ${rep[i] === opt ? 'border-institucional-verde bg-green-50' : 'border-gray-200'}`}>
+                                            <input 
+                                                type="radio" 
+                                                name={`q-${i}`} 
+                                                value={opt} 
+                                                checked={rep[i] === opt}
+                                                onChange={() => setRep({...rep, [i]: opt})}
+                                                className="mr-3 accent-institucional-verde"
+                                            />
+                                            <span className="text-sm text-gray-700">{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-8 text-center bg-yellow-50 border border-yellow-200 p-4 rounded text-yellow-800">
+                        <p className="font-bold">Atención: Una vez enviadas las respuestas, la evaluación finalizará y se generará el reporte en PDF.</p>
+                        <button onClick={onFinish} className="mt-4 bg-institucional-morado hover:bg-institucional-azul text-white font-bold py-3 px-10 rounded shadow-lg text-lg">Finalizar Evaluación</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const Reporte = ({ user, notas }) => {
+            const handlePrint = () => {
+                const element = document.getElementById('reporte-pdf');
+                html2pdf().set({
+                    margin: 10,
+                    filename: `Evaluacion_BUSCARV_${user.id}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, scrollY: 0 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(element).save();
+            };
+
+            const getColor = (nota) => nota >= 70 ? 'text-institucional-verde' : 'text-red-600';
+
+            return (
+                <div>
+                    <div id="reporte-pdf" className="p-8 bg-white" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                        <div className="text-center border-b-4 border-institucional-verde pb-4 mb-4 flex flex-col items-center">
+                            <Logo />
+                            <h1 className="text-3xl font-bold text-institucional-azul mt-4">RESULTADOS DE LA EVALUACIÓN</h1>
+                            <h2 className="text-xl text-institucional-verdeGris">Función BUSCARV - Microsoft Excel</h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded border border-gray-200">
+                            <div><span className="font-bold text-gray-700">Documento:</span> {user.id}</div>
+                            <div><span className="font-bold text-gray-700">Ficha:</span> {user.ficha}</div>
+                            <div className="col-span-2"><span className="font-bold text-gray-700">Aprendiz:</span> {user.nombres} {user.apellidos}</div>
+                        </div>
+
+                        <div className="mt-6">
+                            <h3 className="text-xl font-bold text-institucional-morado border-b mb-4">Desglose de Calificación</h3>
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-institucional-azul text-white">
+                                        <th className="p-3 border">Actividad</th>
+                                        <th className="p-3 border">Peso</th>
+                                        <th className="p-3 border">Puntaje Obtenido</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="p-3 border">Actividad 1: Crucigrama</td>
+                                        <td className="p-3 border text-center">15%</td>
+                                        <td className="p-3 border text-center font-bold">{notas.cruci.toFixed(2)}%</td>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <td className="p-3 border">Actividad 2: Sopa de Letras</td>
+                                        <td className="p-3 border text-center">15%</td>
+                                        <td className="p-3 border text-center font-bold">{notas.sopa.toFixed(2)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="p-3 border">Actividad 3: Casos Prácticos</td>
+                                        <td className="p-3 border text-center">35%</td>
+                                        <td className="p-3 border text-center font-bold">{notas.retos.toFixed(2)}%</td>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <td className="p-3 border">Actividad 4: Test Teórico</td>
+                                        <td className="p-3 border text-center">35%</td>
+                                        <td className="p-3 border text-center font-bold">{notas.test.toFixed(2)}%</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-gray-200">
+                                        <td colSpan="2" className="p-3 border text-right font-bold text-lg">CALIFICACIÓN FINAL:</td>
+                                        <td className={`p-3 border text-center font-bold text-2xl ${getColor(notas.total)}`}>{notas.total.toFixed(2)}%</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        
+                        <div className="text-center mt-12 text-sm text-gray-500">
+                            <p>Documento generado automáticamente por el sistema de evaluación DUA Serverless.</p>
+                            <p>Fecha de ejecución: {new Date().toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="text-center mt-8">
+                        <button onClick={handlePrint} className="bg-institucional-verde hover:bg-institucional-verdeOscuro text-white font-bold py-3 px-8 rounded shadow-lg flex items-center justify-center mx-auto gap-2">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Descargar Reporte PDF
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
