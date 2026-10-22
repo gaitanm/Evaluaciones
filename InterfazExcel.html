@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evaluación DUA: Interfaz de Excel</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- html2pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            senaGreen: '#39A900',
+            senaDarkBlue: '#00304D',
+            senaPurple: '#71277A',
+            senaDarkGreen: '#007832',
+            senaGrayGreen: '#385C57',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      user-select: none;
+      -webkit-user-select: none;
+      background-color: #f4f7f6;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .crossword-grid {
+      display: grid;
+      gap: 2px;
+      background-color: #cbd5e1;
+      padding: 4px;
+      border-radius: 8px;
+    }
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body oncontextmenu="return false;" oncopy="return false;" oncut="return false;" onpaste="return false;">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    /**
+     * Algoritmo Fisher-Yates puro para barajado aleatorio sin sesgos (Regla Anti-Error #1)
+     */
+    function barajarFisherYates(arreglo) {
+      const copia = [...arreglo];
+      for (let i = copia.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = copia[i];
+        copia[i] = copia[j];
+        copia[j] = temp;
+      }
+      return copia;
+    }
+
+    const baseAprendices = [
+      { id: "7427998", nombres: "Leiver Alejandro", apellidos: "Perez Briceño", ficha: "3601882" },
+      { id: "52885511", nombres: "Luz Diomira", apellidos: "Vargas Roa", ficha: "3601882" },
+      { id: "53759438", nombres: "Deicy Janneth", apellidos: "Parra Galeano", ficha: "3601976" },
+      { id: "1000835360", nombres: "Sandra Valeria", apellidos: "Cristancho Romero", ficha: "3601976" },
+      { id: "1001049463", nombres: "Angela Maiden", apellidos: "Sanchez Galeano", ficha: "3601882" },
+      { id: "1001278278", nombres: "Giovanny Steven", apellidos: "Cabrera Largacha", ficha: "3601882" },
+      { id: "1005933083", nombres: "Alicia Ester", apellidos: "Padilla Manjarres", ficha: "3601976" },
+      { id: "1006408884", nombres: "Darla Ghissel", apellidos: "Camargo Martinez", ficha: "3601976" },
+      { id: "1010840409", nombres: "Alison Daniela", apellidos: "Cortes Valdes", ficha: "3601882" },
+      { id: "1011103473", nombres: "Keitlyn Jineth", apellidos: "Gomez Ospina", ficha: "3601976" },
+      { id: "1012350708", nombres: "Jenny Paola", apellidos: "Moreno Molano", ficha: "3601882" },
+      { id: "1012372374", nombres: "Deisy Yuliana", apellidos: "Escobar Meneses", ficha: "3601882" },
+      { id: "1012374106", nombres: "Angie Angelica", apellidos: "Leiva Rodriguez", ficha: "3601882" },
+      { id: "1012424791", nombres: "Leidy Carolina", apellidos: "Camacho Londoño", ficha: "3601882" },
+      { id: "1012462040", nombres: "Yeimmy Marisol", apellidos: "Melo Rodriguez", ficha: "3601882" },
+      { id: "1014666344", nombres: "Luisa Fernanda", apellidos: "Espejo Castro", ficha: "3601882" },
+      { id: "1018414622", nombres: "David Sterling", apellidos: "Pino Rodriguez", ficha: "3601976" },
+      { id: "1019051675", nombres: "Lesly Dayana", apellidos: "Figueroa Chiquillo", ficha: "3601882" },
+      { id: "1021392411", nombres: "Carol Sofia", apellidos: "Monroy Ayala", ficha: "3601976" },
+      { id: "1021670414", nombres: "Paula Andrea", apellidos: "Peña Herran", ficha: "3601882" },
+      { id: "1021671293", nombres: "Angel David", apellidos: "Ramirez Peñalosa", ficha: "3601976" },
+      { id: "1023377434", nombres: "Andres Felipe", apellidos: "Arevalo Cagua", ficha: "3601882" },
+      { id: "1023381379", nombres: "Andres Felipe", apellidos: "Hernandez Valbuena", ficha: "3601976" },
+      { id: "1023382869", nombres: "Disrley Alejandra", apellidos: "Garcia Blanco", ficha: "3601976" },
+      { id: "1024483584", nombres: "Yuli Marcela", apellidos: "Guerrero Morales", ficha: "3601976" },
+      { id: "1024504695", nombres: "Gina Paola", apellidos: "Maldonado Cumaco", ficha: "3601976" },
+      { id: "1025525855", nombres: "Samuel David", apellidos: "Gomez Barragan", ficha: "3601882" },
+      { id: "1025536178", nombres: "John Deyvid", apellidos: "Rojas Soria", ficha: "3601976" },
+      { id: "1026596799", nombres: "Wilder", apellidos: "Romero Vargas", ficha: "3601882" },
+      { id: "1028491849", nombres: "Brandon Stiven", apellidos: "Martínez Torres", ficha: "3601882" },
+      { id: "1028861808", nombres: "Laura", apellidos: "Espitia Caro", ficha: "3601882" },
+      { id: "1029141622", nombres: "David Esteban", apellidos: "Capera Rojas", ficha: "3601882" },
+      { id: "1032413031", nombres: "Oscar Santiago", apellidos: "Jimenez", ficha: "3601976" },
+      { id: "1033102963", nombres: "Emanuel", apellidos: "Zapata Yara", ficha: "3601976" },
+      { id: "1033714968", nombres: "Karen Julieth", apellidos: "Ortiz Gomez", ficha: "3601976" },
+      { id: "1034402196", nombres: "Ana Sofia", apellidos: "Bermudez Cuervo", ficha: "3601976" },
+      { id: "1065586401", nombres: "Gabriela Naileth", apellidos: "Carrillo Londoño", ficha: "3601976" },
+      { id: "1067599092", nombres: "Gislane", apellidos: "Herrera Guerra", ficha: "3601976" },
+      { id: "1072189829", nombres: "Derly Natalia", apellidos: "Garcia Garzon", ficha: "3601882" },
+      { id: "1073685825", nombres: "Deyby Matias", apellidos: "Jimenez Hernandez", ficha: "3601976" },
+      { id: "1073687185", nombres: "Jennifer Paola", apellidos: "Rodriguez Torres", ficha: "3601882" },
+      { id: "1073708263", nombres: "Hasly Yireth", apellidos: "Mora Gonzalez", ficha: "3601976" },
+      { id: "1074812106", nombres: "Luz Heidy", apellidos: "Cordoba Coy", ficha: "3601976" },
+      { id: "1082855011", nombres: "Katiusca Marcela", apellidos: "Mercado Fernandez", ficha: "3601882" },
+      { id: "1090512793", nombres: "Ingrid Liseth", apellidos: "Taches Fernandez", ficha: "3601882" },
+      { id: "1104701234", nombres: "Johan Emilio", apellidos: "Guillen Torres", ficha: "3601976" },
+      { id: "1110371778", nombres: "Mariana Isabel", apellidos: "Gomez Gonzalez", ficha: "3601976" },
+      { id: "1120840411", nombres: "Karem Yulieth", apellidos: "Gamez Villa", ficha: "3601976" },
+      { id: "1127590208", nombres: "Moises Isaac", apellidos: "Rangel Rizzo", ficha: "3601976" },
+      { id: "1136889226", nombres: "Karen Sofia", apellidos: "Cuchibaque Gil", ficha: "3601882" },
+      { id: "1141331648", nombres: "Gabriel", apellidos: "Atandi Arenas", ficha: "3601882" },
+      { id: "1193305061", nombres: "Laura Brillyd", apellidos: "Quintero Zipa", ficha: "3601882" },
+      { id: "1235245525", nombres: "Erick Stefano", apellidos: "Osorio Bachelo", ficha: "3601976" }
+    ].sort((a, b) => Number(a.id) - Number(b.id));
+
+    const bancoConceptos45 = [
+      { palabra: "EXCEL", pista: "Aplicación de hoja de cálculo de la suite de ofimática de Microsoft para almacenar, organizar y analizar datos." },
+      { palabra: "LIBRO", pista: "Nombre que recibe el archivo base en Excel, compuesto por una o más hojas de cálculo." },
+      { palabra: "HOJA", pista: "Área de trabajo compuesta por 16.384 columnas y 1.048.576 filas identificada mediante una etiqueta inferior." },
+      { palabra: "CELDA", pista: "Unidad de inserción de datos formada por la intersección de una fila y una columna." },
+      { palabra: "FILA", pista: "Agrupación horizontal de celdas que se identifica mediante números desde 1 hasta 1.048.576." },
+      { palabra: "COLUMNA", pista: "Agrupación vertical de celdas que se identifica con letras como A, B o ZA." },
+      { palabra: "CINTA", pista: "Conjunto de pestañas o fichas introducido desde Office 2007 que organiza los comandos en grupos lógicos." },
+      { palabra: "GRUPOS", pista: "Subdivisiones lógicas dentro de cada pestaña que contienen comandos que efectúan tareas relacionadas." },
+      { palabra: "COMANDO", pista: "Herramienta o botón individual dentro de un grupo que ejecuta una acción específica en Excel." },
+      { palabra: "INICIO", pista: "Pestaña de la cinta de opciones que contiene los grupos Portapapeles, Fuente, Alineación, Número y Estilos." },
+      { palabra: "INSERTAR", pista: "Pestaña de la cinta de opciones donde se ubican los grupos Tablas e Ilustraciones." },
+      { palabra: "DIBUJAR", pista: "Pestaña de la cinta de opciones situada entre las fichas Insertar y Disposición de página." },
+      { palabra: "FORMULAS", pista: "Barra ubicada debajo de la cinta de opciones que facilita la introducción, edición y visualización de datos." },
+      { palabra: "DATOS", pista: "Pestaña de la cinta de opciones utilizada para gestionar la información, ubicada junto a Fórmulas y Revisar." },
+      { palabra: "REVISAR", pista: "Pestaña de la cinta de opciones ubicada entre las fichas Datos y Vista." },
+      { palabra: "VISTA", pista: "Pestaña de la cinta de opciones que permite configurar la visualización de la ventana de trabajo." },
+      { palabra: "ARCHIVO", pista: "Primera pestaña situada en el extremo izquierdo de la cinta de opciones." },
+      { palabra: "ESTADO", pista: "Barra ubicada en la parte inferior de la ventana que muestra mensajes en tiempo real y cálculos rápidos." },
+      { palabra: "LISTO", pista: "Mensaje en la parte izquierda de la barra de estado cuando Excel no realiza ninguna acción y espera instrucciones." },
+      { palabra: "INTRODUCIR", pista: "Mensaje de la barra de estado al empezar a escribir en una celda, o botón con ícono de verificación." },
+      { palabra: "MODIFICAR", pista: "Mensaje que muestra la barra de estado cuando el usuario edita el contenido de una celda en modo edición." },
+      { palabra: "MACRO", pista: "Botón especial situado junto a los mensajes de la barra de estado para iniciar o detener una grabación." },
+      { palabra: "ZOOM", pista: "Controles situados en el extremo derecho de la barra de estado para acercar o alejar el contenido de la hoja." },
+      { palabra: "PROMEDIO", pista: "Uno de los cálculos rápidos automáticos que muestra la barra de estado al seleccionar un rango numérico." },
+      { palabra: "RECUENTO", pista: "Cálculo rápido de la barra de estado que contabiliza la cantidad de celdas seleccionadas." },
+      { palabra: "MINIMO", pista: "Cálculo rápido en la barra de estado que identifica el valor menor dentro de un rango numérico seleccionado." },
+      { palabra: "MAXIMO", pista: "Cálculo rápido en la barra de estado que identifica el valor mayor dentro de un rango numérico seleccionado." },
+      { palabra: "SUMA", pista: "Cálculo rápido en la barra de estado que totaliza los valores de las celdas numéricas seleccionadas." },
+      { palabra: "GUARDAR", pista: "Comando predeterminado en la barra de acceso rápido representado por el ícono de un disquete." },
+      { palabra: "DESHACER", pista: "Comando predeterminado en la barra de acceso rápido que revierte la última acción realizada." },
+      { palabra: "REHACER", pista: "Comando predeterminado en la barra de acceso rápido que restaura una acción previamente deshecha." },
+      { palabra: "NOMBRES", pista: "Cuadro situado a la izquierda de la barra de fórmulas que muestra la dirección de la celda activa." },
+      { palabra: "CANCELAR", pista: "Botón de la barra de fórmulas que se activa en modo de edición para descartar los cambios en la celda." },
+      { palabra: "FUNCION", pista: "Botón (fx) en la barra de fórmulas que abre el cuadro de diálogo y asistente de funciones paso a paso." },
+      { palabra: "CONSTANTES", pista: "Tipo de datos (texto, números, fechas, horas) cuyo valor no cambia una vez introducidos en la celda." },
+      { palabra: "PLANTILLAS", pista: "Modelos predefinidos disponibles en la pantalla de inicio para crear diferentes tipos de proyectos." },
+      { palabra: "RECIENTES", pista: "Sección de la pantalla de inicio que lista los libros de trabajo abiertos últimamente por el usuario." },
+      { palabra: "ANCLADO", pista: "Sección de la pantalla de inicio junto a Recientes donde se fijan libros de trabajo de uso frecuente." },
+      { palabra: "FUENTE", pista: "Grupo de comandos de la ficha Inicio donde se configura la tipografía predeterminada como Calibri." },
+      { palabra: "ALINEACION", pista: "Grupo de comandos de la pestaña Inicio situado entre los grupos Fuente y Número." },
+      { palabra: "ESTILOS", pista: "Grupo de la ficha Inicio que contiene Formato condicional, Dar formato como tabla y Estilos de celda." },
+      { palabra: "ETIQUETAS", pista: "Pestañas en la parte inferior de la ventana que identifican las hojas del libro y permiten aplicarles colores." },
+      { palabra: "OCULTAR", pista: "Opción del menú contextual de la etiqueta de hoja que permite esconder la hoja seleccionada." },
+      { palabra: "CALIBRI", pista: "Fuente tipográfica que aparece configurada de forma predeterminada en las opciones generales al crear libros." },
+      { palabra: "ENTER", pista: "Tecla que se oprime para confirmar la introducción de un dato en una celda o ir a una celda desde el cuadro de nombres." }
+    ];
+
+    function construirBanco60Retos() {
+      const hojas = [
+        "Inventario", "Nomina", "Proveedores", "Catalogo", "Logistica",
+        "Pacientes", "Matriculas", "Despachos", "Activos", "Cartera",
+        "Facturacion", "Bodega", "Tarifas", "Personal", "Exportaciones"
+      ];
+      const rangos = [
+        { ini: "A2", fin: "F85", cols: 6 },
+        { ini: "B4", fin: "H120", cols: 7 },
+        { ini: "A3", fin: "E250", cols: 5 },
+        { ini: "C5", fin: "J90", cols: 8 },
+        { ini: "A2", fin: "G310", cols: 7 },
+        { ini: "B3", fin: "I145", cols: 8 },
+        { ini: "A5", fin: "D75", cols: 4 },
+        { ini: "C2", fin: "K180", cols: 9 }
+      ];
+      const celdasValor = ["A2", "B2", "C3", "D4", "E2", "F3", "G2", "A5", "B6", "C4"];
+      const parametrosOrden = [
+        { tipo: "exacta", texto: "coincidencia exacta", validos: ["FALSO", "0"], sugerido: "FALSO" },
+        { tipo: "exacta0", texto: "coincidencia exacta (usando código numérico o lógico)", validos: ["0", "FALSO"], sugerido: "0" },
+        { tipo: "aprox", texto: "coincidencia aproximada", validos: ["VERDADERO", "1"], sugerido: "VERDADERO" },
+        { tipo: "aprox1", texto: "coincidencia aproximada (usando valor lógico o binario)", validos: ["1", "VERDADERO"], sugerido: "1" }
+      ];
+      const campos = [
+        "el costo unitario", "el nombre del titular", "el estado del envío",
+        "la fecha de vencimiento", "el código de barra", "el salario básico",
+        "la categoría fiscal", "el teléfono de contacto", "el saldo pendiente",
+        "la ubicación en estante", "el porcentaje de descuento", "el correo institucional"
+      ];
+
+      const retos = [];
+      for (let i = 0; i < 60; i++) {
+        const esHojaExterna = i % 2 === 0;
+        const hoja = hojas[i % hojas.length];
+        const rangoObj = rangos[i % rangos.length];
+        const colIndicador = ((i + 1) % (rangoObj.cols - 1)) + 2;
+        const celdaBuscada = celdasValor[i % celdasValor.length];
+        const param = parametrosOrden[i % parametrosOrden.length];
+        const campo = campos[i % campos.length];
+
+        const colIni = rangoObj.ini.match(/[A-Z]+/)[0];
+        const filaIni = rangoObj.ini.match(/\d+/)[0];
+        const colFin = rangoObj.fin.match(/[A-Z]+/)[0];
+        const filaFin = rangoObj.fin.match(/\d+/)[0];
+
+        const rangoAbsoluto = `$${colIni}$${filaIni}:$${colFin}$${filaFin}`;
+        const prefijoHoja = esHojaExterna ? `${hoja}!` : "";
+        const descripcionUbicacion = esHojaExterna
+          ? `en la hoja externa llamada "${hoja}" dentro del rango ${rangoObj.ini}:${rangoObj.fin}`
+          : `en la misma hoja activa dentro del rango ${rangoObj.ini}:${rangoObj.fin}`;
+
+        const enunciado = `En el cuadro de entrada y edición de fórmulas de la interfaz de Excel, estructure una fórmula con la función BUSCARV (o CONSULTAV) para localizar ${campo}. El valor buscado se encuentra en la celda ${celdaBuscada}, la matriz de búsqueda está ubicada ${descripcionUbicacion} (es obligatorio fijar la matriz con referencias absolutas $), el indicador de columnas es ${colIndicador} y se requiere ${param.texto}. Recuerde separar los argumentos con punto y coma (;).`;
+
+        const solucionMuestra = `=BUSCARV(${celdaBuscada};${prefijoHoja}${rangoAbsoluto};${colIndicador};${param.sugerido})`;
+
+        retos.push({
+          id: i + 1,
+          enunciado,
+          celdaBuscada,
+          esHojaExterna,
+          hoja: hoja.toUpperCase(),
+          rangoAbsoluto,
+          colIndicador: String(colIndicador),
+          validosOrden: param.validos,
+          solucionMuestra
+        });
+      }
+      return retos;
+    }
+
+    const bancoRetos60 = construirBanco60Retos();
+
+    const bancoPreguntas60 = [
+      {
+        id: 1,
+        pregunta: "Según la introducción del marco teórico, ¿qué tipo de aplicación es esencialmente Microsoft Excel dentro de la suite de ofimática?",
+        opciones: [
+          "Una aplicación de hoja de cálculo que permite almacenar, organizar, manipular y analizar datos.",
+          "Un sistema gestor de bases de datos relacionales exclusivo para servidores.",
+          "Un procesador de textos diseñado únicamente para la edición de libros impresos.",
+          "Un entorno de diseño gráfico vectorial para maquetación publicitaria."
+        ],
+        correcta: "Una aplicación de hoja de cálculo que permite almacenar, organizar, manipular y analizar datos."
+      },
+      {
+        id: 2,
+        pregunta: "¿Cuál de las siguientes acciones NO corresponde a las formas comunes mencionadas en el documento para iniciar Excel?",
+        opciones: [
+          "Ejecutar el comando de consola formativo desde el administrador de dispositivos de red.",
+          "Hacer doble clic en el icono de acceso rápido ubicado en el escritorio.",
+          "Buscar 'Excel' en el menú de inicio o en la barra de búsqueda y hacer clic en el resultado.",
+          "Abrir un archivo de Excel existente haciendo clic directamente en él."
+        ],
+        correcta: "Ejecutar el comando de consola formativo desde el administrador de dispositivos de red."
+      },
+      {
+        id: 3,
+        pregunta: "Al iniciar Excel correctamente, la pantalla de inicio presenta tres pestañas para acceder a documentos trabajados previamente o compartidos. ¿Cuáles son?",
+        opciones: [
+          "Recientes, Anclado y Compartidos conmigo.",
+          "Guardados, Eliminados y En la nube.",
+          "Locales, Externos y Protegidos.",
+          "Borradores, Publicados y Archivados."
+        ],
+        correcta: "Recientes, Anclado y Compartidos conmigo."
+      },
+      {
+        id: 4,
+        pregunta: "¿Qué opciones ofrece la pantalla de inicio de Excel para la creación de un nuevo proyecto?",
+        opciones: [
+          "Crear nuevos libros de trabajo en blanco o seleccionar y utilizar plantillas predefinidas.",
+          "Compilar únicamente código fuente externo sin interfaz de celdas.",
+          "Importar exclusivamente bases de datos encriptadas mediante macros obligatorias.",
+          "Reemplazar el sistema operativo por una hoja de cálculo única."
+        ],
+        correcta: "Crear nuevos libros de trabajo en blanco o seleccionar y utilizar plantillas predefinidas."
+      },
+      {
+        id: 5,
+        pregunta: "¿Desde qué versión de Office organiza Microsoft los comandos de sus aplicaciones en grupos lógicos dentro de pestañas o fichas que conforman la Cinta de opciones?",
+        opciones: [
+          "Desde la versión de Office 2007.",
+          "Desde la versión de Office 97.",
+          "Desde la versión de Office 2019.",
+          "Desde la versión de Office 2003."
+        ],
+        correcta: "Desde la versión de Office 2007."
+      },
+      {
+        id: 6,
+        pregunta: "¿Cómo se estructura internamente cada pestaña o ficha de la Cinta de opciones en Excel?",
+        opciones: [
+          "Está conformada por grupos que a su vez están compuestos por comandos que efectúan tareas relacionadas.",
+          "Se divide en celdas numéricas y filas alfabéticas independientes.",
+          "Contiene únicamente barras de estado y controles de zoom deslizantes.",
+          "Está compuesta exclusivamente por menús contextuales ocultos de Windows."
+        ],
+        correcta: "Está conformada por grupos que a su vez están compuestos por comandos que efectúan tareas relacionadas."
+      },
+      {
+        id: 7,
+        pregunta: "De acuerdo con la Figura 2 y la descripción de la Cinta de opciones, ¿cuáles de los siguientes grupos pertenecen a la ficha Inicio?",
+        opciones: [
+          "Portapapeles, Fuente, Alineación, Número, Estilos, Celdas y Edición.",
+          "Tablas, Ilustraciones, Formas, Iconos y Modelos 3D.",
+          "Impresión rápida, Ortografía, Orden ascendente y Modo mouse.",
+          "General, Fórmulas, Revisión, Idioma y Centro de confianza."
+        ],
+        correcta: "Portapapeles, Fuente, Alineación, Número, Estilos, Celdas y Edición."
+      },
+      {
+        id: 8,
+        pregunta: "Según la Figura 2 del marco teórico, ¿qué comandos específicos se visualizan dentro del grupo Estilos de la pestaña Inicio?",
+        opciones: [
+          "Formato condicional, Dar formato como tabla y Estilos de celda.",
+          "Tabla dinámica, Tablas dinámicas recomendadas y Tabla.",
+          "Insertar, Eliminar y Formato.",
+          "Cancelar, Introducir e Insertar función."
+        ],
+        correcta: "Formato condicional, Dar formato como tabla y Estilos de celda."
+      },
+      {
+        id: 9,
+        pregunta: "¿En qué lugar de la ventana de Excel se sitúa por defecto la Barra de herramientas de acceso rápido?",
+        opciones: [
+          "En la parte superior izquierda de la ventana de Excel, por encima de la cinta de opciones.",
+          "En la esquina inferior derecha, junto a los controles de zoom.",
+          "Debajo de las etiquetas de hojas de cálculo en la barra de estado.",
+          "En el panel central derecho dentro del área de inserción de celdas."
+        ],
+        correcta: "En la parte superior izquierda de la ventana de Excel, por encima de la cinta de opciones."
+      },
+      {
+        id: 10,
+        pregunta: "¿Cuáles son los tres comandos que vienen activos por defecto en la barra de herramientas de acceso rápido?",
+        opciones: [
+          "Guardar, Deshacer y Rehacer.",
+          "Cortar, Copiar y Pegar.",
+          "Nuevo, Abrir e Imprimir.",
+          "Cancelar, Introducir e Insertar función."
+        ],
+        correcta: "Guardar, Deshacer y Rehacer."
+      },
+      {
+        id: 11,
+        pregunta: "Además de encima de la cinta de opciones, ¿en qué otra ubicación permite Excel mostrar la barra de herramientas de acceso rápido mediante su menú desplegable?",
+        opciones: [
+          "Debajo de la cinta de opciones.",
+          "Verticalmente sobre el encabezado de la columna A.",
+          "Integrada dentro de la barra de estado inferior.",
+          "Flotando sobre las etiquetas de las hojas de cálculo."
+        ],
+        correcta: "Debajo de la cinta de opciones."
+      },
+      {
+        id: 12,
+        pregunta: "¿Cuál es el procedimiento directo para agregar un comando específico de la cinta de opciones (como Tabla dinámica) a la barra de herramientas de acceso rápido?",
+        opciones: [
+          "Dar clic derecho sobre el icono de la herramienta y seleccionar 'Agregar a la barra de herramientas de acceso rápido'.",
+          "Arrastrar el icono con clic izquierdo hacia la barra de estado inferior.",
+          "Presionar las teclas Shift + F11 mientras se señala el comando.",
+          "Dar doble clic izquierdo sobre el cuadro de nombres y escribir el nombre del comando."
+        ],
+        correcta: "Dar clic derecho sobre el icono de la herramienta y seleccionar 'Agregar a la barra de herramientas de acceso rápido'."
+      },
+      {
+        id: 13,
+        pregunta: "¿Qué ocurre cuando se da clic derecho sobre el rótulo que identifica a un grupo de comandos (por ejemplo, Ilustraciones) y se elige 'Agregar a la barra de herramientas de acceso rápido'?",
+        opciones: [
+          "Se agregan simultáneamente a la barra de acceso rápido todos los comandos que componen ese grupo.",
+          "Se oculta el grupo completo de la cinta de opciones de manera permanente.",
+          "Se eliminan todos los botones previos de la barra de herramientas de acceso rápido.",
+          "Se crea una nueva hoja de cálculo llamada Ilustraciones en el libro activo."
+        ],
+        correcta: "Se agregan simultáneamente a la barra de acceso rápido todos los comandos que componen ese grupo."
+      },
+      {
+        id: 14,
+        pregunta: "En el cuadro de diálogo 'Personalizar barra de acceso rápido' (Figura 6), ¿qué información se muestra en el panel de la parte izquierda?",
+        opciones: [
+          "Los comandos disponibles organizados alfabéticamente y por categorías.",
+          "Únicamente la lista de libros abiertos recientemente en el equipo.",
+          "Los comandos que ya están activos actualmente en la barra de acceso rápido.",
+          "Las propiedades de privacidad y vinculación con cuentas de LinkedIn."
+        ],
+        correcta: "Los comandos disponibles organizados alfabéticamente y por categorías."
+      },
+      {
+        id: 15,
+        pregunta: "En el cuadro de diálogo 'Personalizar barra de acceso rápido' (Figura 6), ¿qué se visualiza en el panel de la parte derecha?",
+        opciones: [
+          "La lista de comandos que en la actualidad están activos en la barra de herramientas de acceso rápido.",
+          "El listado de todas las celdas que contienen fórmulas en la hoja activa.",
+          "Las plantillas en línea disponibles para descargar desde Microsoft Office.",
+          "El historial de acciones deshechas durante la sesión de trabajo."
+        ],
+        correcta: "La lista de comandos que en la actualidad están activos en la barra de herramientas de acceso rápido."
+      },
+      {
+        id: 16,
+        pregunta: "Dentro del cuadro de diálogo para personalizar la barra de acceso rápido, ¿para qué sirven los botones con iconos de flecha arriba y flecha abajo?",
+        opciones: [
+          "Permiten cambiar la posición del comando seleccionado, personalizando el orden en que aparecerán en la barra.",
+          "Sirven para aumentar o disminuir el tamaño de la fuente predeterminada de la hoja.",
+          "Permiten desplazarse entre la primera y la última fila de la hoja de cálculo.",
+          "Cambian el nivel de zoom de la ventana de configuración."
+        ],
+        correcta: "Permiten cambiar la posición del comando seleccionado, personalizando el orden en que aparecerán en la barra."
+      },
+      {
+        id: 17,
+        pregunta: "En el cuadro de diálogo 'Personalizar barra de acceso rápido', ¿qué acción realiza el botón 'Quitar'?",
+        opciones: [
+          "Elimina de la barra de herramientas de acceso rápido el comando que esté seleccionado en el panel derecho.",
+          "Desinstala la herramienta de forma definitiva de la cinta de opciones de Excel.",
+          "Borra el contenido de la celda activa en la hoja de cálculo.",
+          "Elimina la hoja de cálculo actual del libro de trabajo."
+        ],
+        correcta: "Elimina de la barra de herramientas de acceso rápido el comando que esté seleccionado en el panel derecho."
+      },
+      {
+        id: 18,
+        pregunta: "¿Dónde se encuentra ubicada la Barra de fórmulas dentro de la interfaz de Excel?",
+        opciones: [
+          "Debajo de la cinta de opciones.",
+          "En la parte inferior de la ventana, debajo de las etiquetas de hojas.",
+          "En la barra de título superior, a la izquierda del botón Cerrar.",
+          "En el panel lateral izquierdo de la pantalla de inicio."
+        ],
+        correcta: "Debajo de la cinta de opciones."
+      },
+      {
+        id: 19,
+        pregunta: "¿Cuáles son los 3 componentes principales que conforman la Barra de fórmulas según la Figura 7?",
+        opciones: [
+          "Cuadro de nombres, Botones de la barra de fórmulas y Cuadro de entrada y edición de fórmulas.",
+          "Mensajes de estado, Cálculos rápidos y Controles de zoom.",
+          "Guardar, Deshacer y Rehacer.",
+          "Portapapeles, Fuente y Alineación."
+        ],
+        correcta: "Cuadro de nombres, Botones de la barra de fórmulas y Cuadro de entrada y edición de fórmulas."
+      },
+      {
+        id: 20,
+        pregunta: "¿Qué elemento se muestra en el Cuadro de nombres situado a la izquierda de la barra de fórmulas?",
+        opciones: [
+          "La dirección o referencia de la celda activa (la celda seleccionada en ese momento).",
+          "El nombre del usuario registrado en la copia de Microsoft Office.",
+          "El título del archivo o libro de trabajo guardado en el disco.",
+          "El resultado de la suma rápida de todas las hojas del libro."
+        ],
+        correcta: "La dirección o referencia de la celda activa (la celda seleccionada en ese momento)."
+      },
+      {
+        id: 21,
+        pregunta: "¿Cómo puede un usuario desplazarse directamente a la celda G1394 utilizando el Cuadro de nombres?",
+        opciones: [
+          "Escribiendo la referencia G1394 en el cuadro de nombres y pulsando la tecla Enter.",
+          "Escribiendo G1394 en la barra de estado y presionando la tecla Escape.",
+          "Dando clic derecho en el botón Guardar y digitando G1394.",
+          "Presionando simultáneamente las teclas Shift + F11 y escribiendo G1394."
+        ],
+        correcta: "Escribiendo la referencia G1394 en el cuadro de nombres y pulsando la tecla Enter."
+      },
+      {
+        id: 22,
+        pregunta: "¿Cuáles son los 3 botones que se ubican junto al cuadro de nombres en la barra de fórmulas?",
+        opciones: [
+          "Cancelar, Introducir e Insertar función.",
+          "Guardar, Deshacer y Rehacer.",
+          "Vista Normal, Diseño de página y Salto de página.",
+          "Minimizar, Maximizar y Cerrar."
+        ],
+        correcta: "Cancelar, Introducir e Insertar función."
+      },
+      {
+        id: 23,
+        pregunta: "¿En qué momento se activan los botones 'Cancelar' e 'Introducir' de la barra de fórmulas?",
+        opciones: [
+          "Cuando el usuario está modificando el contenido de una celda, es decir, cuando se está en el modo de edición.",
+          "Únicamente cuando el libro de trabajo no tiene hojas visibles.",
+          "Solo cuando se selecciona una gráfica en 3D de la pestaña Insertar.",
+          "Cuando el mensaje de la barra de estado muestra la palabra 'Listo'."
+        ],
+        correcta: "Cuando el usuario está modificando el contenido de una celda, es decir, cuando se está en el modo de edición."
+      },
+      {
+        id: 24,
+        pregunta: "¿Cuál es la utilidad del botón 'Insertar función' (fx) situado en la barra de fórmulas?",
+        opciones: [
+          "Acceder rápidamente al cuadro de diálogo de funciones para buscar funciones y construirlas mediante un asistente paso a paso.",
+          "Insertar una nueva hoja de cálculo a la derecha de la etiqueta activa.",
+          "Cambiar el tipo y tamaño de la fuente predeterminada de todo el libro.",
+          "Iniciar la grabación automática de una macro en la barra de estado."
+        ],
+        correcta: "Acceder rápidamente al cuadro de diálogo de funciones para buscar funciones y construirlas mediante un asistente paso a paso."
+      },
+      {
+        id: 25,
+        pregunta: "¿Qué caracteres iniciales permiten que Excel reconozca que lo escrito en el cuadro de entrada corresponde a una fórmula o función?",
+        opciones: [
+          "El signo igual (=), el signo más (+) o el signo menos (-).",
+          "Únicamente el símbolo de numeral (#) o el signo de interrogación (?).",
+          "Las comillas dobles (\") o el punto y coma (;).",
+          "El símbolo de porcentaje (%) o el ampersand (&)."
+        ],
+        correcta: "El signo igual (=), el signo más (+) o el signo menos (-)."
+      },
+      {
+        id: 26,
+        pregunta: "Cuando se introduce una fórmula o función en una celda, ¿qué se muestra en la celda activa y qué se observa en la barra de fórmulas respectivamente?",
+        opciones: [
+          "En la celda se muestra el resultado del cálculo, mientras que en la barra de fórmulas se observa la fórmula o sintaxis introducida.",
+          "En la celda se muestra la sintaxis de la función y en la barra de fórmulas aparece únicamente el resultado numérico.",
+          "En ambos lugares se oculta el valor por seguridad y solo se ve en la vista previa de impresión.",
+          "En la celda aparece la palabra 'Fórmula' y en la barra de fórmulas aparece la dirección A1."
+        ],
+        correcta: "En la celda se muestra el resultado del cálculo, mientras que en la barra de fórmulas se observa la fórmula o sintaxis introducida."
+      },
+      {
+        id: 27,
+        pregunta: "¿Dónde se ubica la Barra de estado y cuál es su propósito general?",
+        opciones: [
+          "En la parte inferior de la ventana; proporciona información útil sobre lo que ocurre en tiempo real en la hoja de cálculo.",
+          "Sobre la cinta de opciones; sirve exclusivamente para cerrar o minimizar el programa.",
+          "Dentro de la pestaña Archivo; permite configurar la cuenta de correo institucional.",
+          "En el encabezado de las columnas; numera las celdas de izquierda a derecha."
+        ],
+        correcta: "En la parte inferior de la ventana; proporciona información útil sobre lo que ocurre en tiempo real en la hoja de cálculo."
+      },
+      {
+        id: 28,
+        pregunta: "En la parte izquierda de la barra de estado, ¿qué indica el mensaje 'Listo'?",
+        opciones: [
+          "Que no se está realizando ninguna acción y Excel está esperando la próxima instrucción.",
+          "Que el documento ya fue enviado por correo electrónico satisfactoriamente.",
+          "Que el usuario está editando activamente una fórmula dentro de una celda.",
+          "Que la memoria de la hoja de cálculo ha alcanzado el límite de filas."
+        ],
+        correcta: "Que no se está realizando ninguna acción y Excel está esperando la próxima instrucción."
+      },
+      {
+        id: 29,
+        pregunta: "Cuando el usuario comienza a escribir por primera vez en una celda seleccionada, ¿a qué palabra cambia el mensaje en la parte izquierda de la barra de estado?",
+        opciones: [
+          "Cambia a 'Introducir', señalando que se está ingresando información.",
+          "Cambia a 'Modificar', indicando que se abrió un archivo antiguo.",
+          "Cambia a 'Calculando', bloqueando el teclado temporalmente.",
+          "Cambia a 'Anclado', fijando la celda en la pantalla de inicio."
+        ],
+        correcta: "Cambia a 'Introducir', señalando que se está ingresando información."
+      },
+      {
+        id: 30,
+        pregunta: "Si el usuario edita el contenido existente de una celda, ¿qué mensaje muestra la barra de estado para indicar que se trabaja en modo de edición?",
+        opciones: [
+          "Muestra el mensaje 'Modificar'.",
+          "Muestra el mensaje 'Rehacer'.",
+          "Muestra el mensaje 'Compartir'.",
+          "Muestra el mensaje 'Validación'."
+        ],
+        correcta: "Muestra el mensaje 'Modificar'."
+      },
+      {
+        id: 31,
+        pregunta: "¿Qué botón especial se ubica en la barra de estado justo al lado derecho de los mensajes de estado (Listo/Introducir/Modificar)?",
+        opciones: [
+          "Un botón que permite iniciar o detener la grabación de una macro.",
+          "El botón para insertar una función paso a paso.",
+          "El comando para deshacer el borrado de una hoja de cálculo.",
+          "El control deslizante para ajustar el porcentaje de zoom."
+        ],
+        correcta: "Un botón que permite iniciar o detener la grabación de una macro."
+      },
+      {
+        id: 32,
+        pregunta: "Al seleccionar un rango de celdas numéricas (Figura 8), ¿cuáles son los 6 cálculos rápidos que muestra automáticamente la barra de estado?",
+        opciones: [
+          "Promedio, Recuento, Recuento numérico, Mínimo, Máximo y Suma.",
+          "Mediana, Moda, Varianza, Desviación, Raíz y Potencia.",
+          "Suma, Resta, Multiplicación, División, Porcentaje y Residuo.",
+          "Contar.si, Buscarv, Concatenar, Ahora, Hoy y Aleatorio."
+        ],
+        correcta: "Promedio, Recuento, Recuento numérico, Mínimo, Máximo y Suma."
+      },
+      {
+        id: 33,
+        pregunta: "¿Cuáles son las tres formas de ver el documento disponibles en los botones de 'Vista de página' de la barra de estado?",
+        opciones: [
+          "Vista Normal, Vista de Diseño de Página y Vista Previa de Salto de Página.",
+          "Vista Aérea, Vista Tridimensional y Vista de Código Fuente.",
+          "Vista Compacta, Vista Expandida y Vista de Pantalla Completa.",
+          "Vista Preliminar, Vista de Fórmulas y Vista de Macros."
+        ],
+        correcta: "Vista Normal, Vista de Diseño de Página y Vista Previa de Salto de Página."
+      },
+      {
+        id: 34,
+        pregunta: "¿Para qué sirven los controles de zoom ubicados en el extremo derecho de la barra de estado?",
+        opciones: [
+          "Para acercar o alejar el contenido de la hoja de cálculo, permitiendo ver los datos con mayor detalle o en una vista más general.",
+          "Para cambiar automáticamente el tamaño de la fuente impresa en el papel.",
+          "Para aumentar el número máximo de columnas disponibles en el libro.",
+          "Para desplazarse rápidamente a la última celda de la columna activa."
+        ],
+        correcta: "Para acercar o alejar el contenido de la hoja de cálculo, permitiendo ver los datos con mayor detalle o en una vista más general."
+      },
+      {
+        id: 35,
+        pregunta: "¿Cómo se denomina el archivo base en Excel y cómo varía la cantidad de hojas por defecto al crear un libro nuevo según la versión?",
+        opciones: [
+          "Se denomina libro de trabajo; en versiones anteriores a 2013 aparecen 3 hojas por defecto y 1 en versiones posteriores.",
+          "Se denomina hoja maestra; en todas las versiones aparecen siempre 5 hojas por defecto.",
+          "Se denomina plantilla; en versiones anteriores a 2013 aparece 1 hoja y 3 en versiones posteriores.",
+          "Se denomina cuadrícula; no incluye hojas hasta que se presiona Ctrl + Inicio."
+        ],
+        correcta: "Se denomina libro de trabajo; en versiones anteriores a 2013 aparecen 3 hojas por defecto y 1 en versiones posteriores."
+      },
+      {
+        id: 36,
+        pregunta: "¿Por cuántas columnas y cuántas filas está compuesta exactamente una hoja de cálculo de Excel según el marco teórico?",
+        opciones: [
+          "Por 16.384 columnas y 1.048.576 filas.",
+          "Por 1.048.576 columnas y 16.384 filas.",
+          "Por 256 columnas y 65.536 filas.",
+          "Por 10.000 columnas y 500.000 filas."
+        ],
+        correcta: "Por 16.384 columnas y 1.048.576 filas."
+      },
+      {
+        id: 37,
+        pregunta: "¿Cómo se identifican las columnas y las filas respectivamente en una hoja de cálculo de Excel?",
+        opciones: [
+          "Las columnas se identifican con letras (como A, B, ZA) y las filas con números.",
+          "Las columnas se identifican con números romanos y las filas con letras minúsculas.",
+          "Las columnas se identifican con números y las filas con letras del alfabeto.",
+          "Ambas se identifican exclusivamente mediante coordenadas numéricas separadas por comas."
+        ],
+        correcta: "Las columnas se identifican con letras (como A, B, ZA) y las filas con números."
+      },
+      {
+        id: 38,
+        pregunta: "¿Cómo se define una 'celda' y de qué manera se construye su identificador o referencia (por ejemplo, D3)?",
+        opciones: [
+          "Es la intersección de una fila y una columna; se identifica con la letra de la columna acompañada del número de la fila.",
+          "Es la unión de dos hojas de cálculo; se identifica con el número de fila seguido de la letra de columna (3D).",
+          "Es un grupo de la cinta de opciones; se identifica mediante el nombre de la pestaña superior.",
+          "Es el cuadro de diálogo de opciones; se identifica con el signo pesos seguido del nombre del archivo."
+        ],
+        correcta: "Es la intersección de una fila y una columna; se identifica con la letra de la columna acompañada del número de la fila."
+      },
+      {
+        id: 39,
+        pregunta: "¿Qué tipos de datos se pueden introducir en una celda y cuáles de ellos se denominan 'datos constantes'?",
+        opciones: [
+          "Se pueden introducir texto, números, fechas, horas, funciones o fórmulas; los 4 primeros son datos constantes porque su valor no cambia.",
+          "Solo se pueden introducir fórmulas y macros; ambos se conocen como datos constantes.",
+          "Se pueden introducir imágenes y sonidos; se llaman constantes porque ocupan toda la fila.",
+          "Se pueden introducir funciones lógicas; son constantes porque nunca requieren el signo igual."
+        ],
+        correcta: "Se pueden introducir texto, números, fechas, horas, funciones o fórmulas; los 4 primeros son datos constantes porque su valor no cambia."
+      },
+      {
+        id: 40,
+        pregunta: "Una vez digitado un dato en una celda activa, ¿qué debe hacer el usuario para confirmar e introducir dicho dato?",
+        opciones: [
+          "Oprimir la tecla Enter o dar clic en el botón Introducir de la barra de fórmulas.",
+          "Oprimir la tecla Escape o dar clic en el botón Cancelar de la barra de fórmulas.",
+          "Presionar la combinación Shift + F11 para guardar el dato.",
+          "Dar clic derecho sobre la barra de estado y elegir 'Listo'."
+        ],
+        correcta: "Oprimir la tecla Enter o dar clic en el botón Introducir de la barra de fórmulas."
+      },
+      {
+        id: 41,
+        pregunta: "¿Qué combinación de teclas (atajo de teclado) permite agregar rápidamente una hoja nueva en el libro activo?",
+        opciones: [
+          "Shift (Mayúsculas) + F11.",
+          "Ctrl + Inicio.",
+          "Ctrl + Flecha Derecha.",
+          "Alt + F4."
+        ],
+        correcta: "Shift (Mayúsculas) + F11."
+      },
+      {
+        id: 42,
+        pregunta: "Además del atajo de teclado Shift + F11, ¿qué botón de la interfaz permite insertar rápidamente una hoja nueva?",
+        opciones: [
+          "El botón 'Hoja nueva' (+), ubicado a la derecha de la etiqueta de la última hoja del libro.",
+          "El botón 'Insertar función' (fx), ubicado en la barra de fórmulas.",
+          "El botón 'Macro', ubicado en la esquina inferior izquierda de la barra de estado.",
+          "El botón 'Agregar', dentro de las opciones de privacidad."
+        ],
+        correcta: "El botón 'Hoja nueva' (+), ubicado a la derecha de la etiqueta de la última hoja del libro."
+      },
+      {
+        id: 43,
+        pregunta: "¿Cuál es la forma rápida con el ratón para modificar directamente el rótulo o nombre que identifica una hoja de cálculo?",
+        opciones: [
+          "Dar doble clic sobre la pestaña que identifica la hoja para que el rótulo quede seleccionado y listo para edición.",
+          "Dar un solo clic en el cuadro de nombres y borrar la referencia A1.",
+          "Arrastrar la etiqueta de la hoja hacia la barra de herramientas de acceso rápido.",
+          "Mantener oprimida la tecla Control mientras se gira la rueda del ratón."
+        ],
+        correcta: "Dar doble clic sobre la pestaña que identifica la hoja para que el rótulo quede seleccionado y listo para edición."
+      },
+      {
+        id: 44,
+        pregunta: "Según la Figura 12, ¿cuáles de las siguientes opciones aparecen al desplegar el menú contextual dando clic derecho sobre la pestaña de una hoja?",
+        opciones: [
+          "Insertar, Eliminar, Cambiar nombre, Mover o copiar, Ver código, Proteger hoja, Color de pestaña, Ocultar, Mostrar y Seleccionar todas las hojas.",
+          "Guardar, Deshacer, Rehacer, Impresión rápida, Ortografía y Orden ascendente.",
+          "Portapapeles, Fuente, Alineación, Número, Estilos, Celdas y Edición.",
+          "Promedio, Recuento, Recuento numérico, Mínimo, Máximo y Suma."
+        ],
+        correcta: "Insertar, Eliminar, Cambiar nombre, Mover o copiar, Ver código, Proteger hoja, Color de pestaña, Ocultar, Mostrar y Seleccionar todas las hojas."
+      },
+      {
+        id: 45,
+        pregunta: "En el cuadro de diálogo 'Mover o copiar' (Figura 13), ¿qué casilla debe estar seleccionada si se desea duplicar la hoja en lugar de solo cambiarla de posición?",
+        opciones: [
+          "La casilla 'Crear una copia'.",
+          "La casilla 'Mover al final'.",
+          "La casilla 'Proteger hoja'.",
+          "La casilla 'Mostrar debajo de la cinta de opciones'."
+        ],
+        correcta: "La casilla 'Crear una copia'."
+      },
+      {
+        id: 46,
+        pregunta: "¿Qué requisito debe cumplirse para mover o copiar una hoja desde el libro activo hacia otro libro existente mediante el menú desplegable 'Al libro' (Figura 14)?",
+        opciones: [
+          "El otro libro de destino debe encontrarse abierto (o bien se puede elegir la opción '(nuevo libro)').",
+          "El libro de destino debe estar cerrado y comprimido en una carpeta externa.",
+          "Ambos libros deben tener exactamente una sola celda con datos constantes.",
+          "Se debe reiniciar Excel antes de abrir el menú contextual."
+        ],
+        correcta: "El otro libro de destino debe encontrarse abierto (o bien se puede elegir la opción '(nuevo libro)')."
+      },
+      {
+        id: 47,
+        pregunta: "Si se traslada una hoja a otro libro mediante 'Mover o copiar' y NO se marca la casilla 'Crear una copia', ¿qué sucede con la hoja en el libro de origen?",
+        opciones: [
+          "Excel eliminará la hoja del libro de origen al moverla al libro de destino.",
+          "Excel conservará una copia oculta en el libro de origen automáticamente.",
+          "Excel bloqueará la operación y mostrará un error de sintaxis.",
+          "La hoja cambiará su color de pestaña a rojo en el libro de origen."
+        ],
+        correcta: "Excel eliminará la hoja del libro de origen al moverla al libro de destino."
+      },
+      {
+        id: 48,
+        pregunta: "¿Cómo se puede mover y cómo se puede copiar una hoja de cálculo arrastrándola directamente con el ratón sobre la barra de etiquetas (Figura 15)?",
+        opciones: [
+          "Para moverla se selecciona y se arrastra con clic sostenido; para copiarla se arrastra con clic sostenido manteniendo oprimida la tecla Control.",
+          "Para moverla se usa clic derecho sostenido; para copiarla se mantiene oprimida la tecla Shift + F11.",
+          "Para moverla se da doble clic; para copiarla se presiona la tecla Enter mientras se arrastra.",
+          "Ambas acciones requieren arrastrar la etiqueta hacia el cuadro de nombres."
+        ],
+        correcta: "Para moverla se selecciona y se arrastra con clic sostenido; para copiarla se arrastra con clic sostenido manteniendo oprimida la tecla Control."
+      },
+      {
+        id: 49,
+        pregunta: "Según la advertencia destacada en la página 9 del marco teórico, ¿qué particularidad crítica tienen las acciones de cambiar el rótulo, mover, copiar y eliminar hojas en Excel?",
+        opciones: [
+          "Son acciones que NO se pueden deshacer.",
+          "Son acciones que solo tienen efecto después de reiniciar el computador.",
+          "Son acciones que borran automáticamente la barra de acceso rápido.",
+          "Son acciones exclusivas para hojas que no contienen números."
+        ],
+        correcta: "Son acciones que NO se pueden deshacer."
+      },
+      {
+        id: 50,
+        pregunta: "En el cuadro de diálogo 'Opciones de Excel' -> categoría 'General', dentro de la sección 'Al crear nuevos libros' (Figura 16), ¿qué parámetros predeterminados se pueden configurar?",
+        opciones: [
+          "Fuente predeterminada (ej. Calibri), Tamaño de fuente (ej. 11), Vista predeterminada para hojas nuevas e Incluir este número de hojas.",
+          "El ancho de las 16.384 columnas, el idioma del teclado y la contraseña de red.",
+          "Los cálculos rápidos de la barra de estado y el color del cursor.",
+          "La dirección de la celda activa y la activación del botón Cancelar."
+        ],
+        correcta: "Fuente predeterminada (ej. Calibri), Tamaño de fuente (ej. 11), Vista predeterminada para hojas nuevas e Incluir este número de hojas."
+      },
+      {
+        id: 51,
+        pregunta: "Si en las Opciones generales de Excel se modifica el número de hojas que contendrá el próximo libro que se cree y se oprime Aceptar, ¿cuándo se aplicarán los cambios?",
+        opciones: [
+          "Los cambios se aplicarán cuando se reinicie el programa.",
+          "Se aplican de forma retroactiva a todos los libros guardados en el disco duro.",
+          "Se aplican instantáneamente agregando hojas al libro abierto sin reiniciar.",
+          "Solo se aplican si se presiona simultáneamente Ctrl + Inicio."
+        ],
+        correcta: "Los cambios se aplicarán cuando se reinicie el programa."
+      },
+      {
+        id: 52,
+        pregunta: "En la categoría 'General' de las Opciones de Excel (Figura 16), ¿en qué subsección se encuentran los campos 'Nombre de usuario' y 'Tema de Office'?",
+        opciones: [
+          "En la sección 'Personalizar la copia de Microsoft Office'.",
+          "En la sección 'Al crear nuevos libros'.",
+          "En la sección 'Características de LinkedIn'.",
+          "En la sección 'Opciones de inicio'."
+        ],
+        correcta: "En la sección 'Personalizar la copia de Microsoft Office'."
+      },
+      {
+        id: 53,
+        pregunta: "De acuerdo con la Tabla 1 de atajos de teclado (página 10), ¿qué combinación de teclas permite desplazarse directamente a la celda A1?",
+        opciones: [
+          "CTRL + INICIO (Control + Inicio).",
+          "CTRL + FLECHA ARRIBA.",
+          "SHIFT + F11.",
+          "CTRL + FLECHA IZQUIERDA."
+        ],
+        correcta: "CTRL + INICIO (Control + Inicio)."
+      },
+      {
+        id: 54,
+        pregunta: "Según la Tabla 1 de desplazamiento entre celdas, ¿qué teclas se utilizan para moverse una celda hacia arriba, abajo, izquierda o derecha de la celda activa?",
+        opciones: [
+          "La tecla de FLECHA correspondiente.",
+          "La tecla Tabulador combinada con F11.",
+          "La tecla Control más el botón Introducir.",
+          "El botón de Macro en la barra de estado."
+        ],
+        correcta: "La tecla de FLECHA correspondiente."
+      },
+      {
+        id: 55,
+        pregunta: "Según la Tabla 1 del documento, ¿qué combinación de teclas permite desplazarse a la primera celda de la fila activa?",
+        opciones: [
+          "CTRL + FLECHA IZQUIERDA.",
+          "CTRL + FLECHA ARRIBA.",
+          "CTRL + FLECHA DERECHA.",
+          "CTRL + INICIO."
+        ],
+        correcta: "CTRL + FLECHA IZQUIERDA."
+      },
+      {
+        id: 56,
+        pregunta: "De acuerdo con la Tabla 1 del marco teórico, ¿qué combinación de teclas permite desplazarse a la última celda de la fila activa?",
+        opciones: [
+          "CTRL + FLECHA DERECHA.",
+          "CTRL + FLECHA ABAJO.",
+          "CTRL + FLECHA IZQUIERDA.",
+          "SHIFT + FLECHA DERECHA."
+        ],
+        correcta: "CTRL + FLECHA DERECHA."
+      },
+      {
+        id: 57,
+        pregunta: "Según la Tabla 1 del documento, ¿qué combinación de teclas permite desplazarse a la primera celda de la columna activa?",
+        opciones: [
+          "CTRL + FLECHA ARRIBA.",
+          "CTRL + FLECHA IZQUIERDA.",
+          "CTRL + INICIO.",
+          "CTRL + FLECHA ABAJO."
+        ],
+        correcta: "CTRL + FLECHA ARRIBA."
+      },
+      {
+        id: 58,
+        pregunta: "De acuerdo con la Tabla 1 del marco teórico, ¿qué combinación de teclas permite desplazarse a la última celda de la columna activa?",
+        opciones: [
+          "CTRL + FLECHA ABAJO.",
+          "CTRL + FLECHA DERECHA.",
+          "SHIFT + F11.",
+          "CTRL + FLECHA ARRIBA."
+        ],
+        correcta: "CTRL + FLECHA ABAJO."
+      },
+      {
+        id: 59,
+        pregunta: "En el cuadro de diálogo 'Personalizar barra de herramientas de acceso rápido' (Figura 6), ¿qué indica el elemento '<Separador>' que aparece en la lista del panel derecho?",
+        opciones: [
+          "Un elemento divisor que permite agrupar visualmente o separar comandos en la barra de acceso rápido.",
+          "Un error de carga de comandos que elimina las macros del libro.",
+          "El comando encargado de dividir una celda en múltiples filas.",
+          "La etiqueta que separa la barra de fórmulas de la barra de estado."
+        ],
+        correcta: "Un elemento divisor que permite agrupar visualmente o separar comandos en la barra de acceso rápido."
+      },
+      {
+        id: 60,
+        pregunta: "Según las Figuras 4 y 5 del marco teórico, al dar clic derecho sobre un comando o grupo de la cinta de opciones, ¿qué otras dos opciones aparecen en el menú contextual además de 'Agregar a la barra de herramientas de acceso rápido'?",
+        opciones: [
+          "'Personalizar la cinta de opciones...' y 'Contraer la cinta de opciones'.",
+          "'Eliminar hoja' y 'Proteger libro de trabajo'.",
+          "'Cambiar fuente predeterminada' y 'Reiniciar Excel'.",
+          "'Insertar función' y 'Cancelar edición'."
+        ],
+        correcta: "'Personalizar la cinta de opciones...' y 'Contraer la cinta de opciones'."
+      }
+    ];
+
+    function construirCrucigrama2D(conceptosBarajados) {
+      const N = 22;
+      const seleccionados = conceptosBarajados.slice(0, 15);
+      // Garantizar mínimo 40% horizontal (7-8) y 40% vertical (7-8)
+      const direcciones = [];
+      for (let i = 0; i < 15; i++) {
+        direcciones.push(i < 8 ? "H" : "V");
+      }
+      const dirMezcladas = barajarFisherYates(direcciones);
+
+      const grid = Array.from({ length: N }, () => Array(N).fill(null));
+      const palabrasColocadas = [];
+
+      function puedeColocar(palabra, fila, col, dir) {
+        if (dir === "H") {
+          if (col + palabra.length > N) return false;
+          if (col > 0 && grid[fila][col - 1] !== null) return false;
+          if (col + palabra.length < N && grid[fila][col + palabra.length] !== null) return false;
+          for (let k = 0; k < palabra.length; k++) {
+            const actual = grid[fila][col + k];
+            if (actual !== null && actual !== palabra[k]) return false;
+            if (actual === null) {
+              if (fila > 0 && grid[fila - 1][col + k] !== null) return false;
+              if (fila < N - 1 && grid[fila + 1][col + k] !== null) return false;
+            }
+          }
+          return true;
+        } else {
+          if (fila + palabra.length > N) return false;
+          if (fila > 0 && grid[fila - 1][col] !== null) return false;
+          if (fila + palabra.length < N && grid[fila + palabra.length][col] !== null) return false;
+          for (let k = 0; k < palabra.length; k++) {
+            const actual = grid[fila + k][col];
+            if (actual !== null && actual !== palabra[k]) return false;
+            if (actual === null) {
+              if (col > 0 && grid[fila + k][col - 1] !== null) return false;
+              if (col < N - 1 && grid[fila + k][col + 1] !== null) return false;
+            }
+          }
+          return true;
+        }
+      }
+
+      seleccionados.forEach((item, idx) => {
+        const palabra = item.palabra.toUpperCase();
+        const dirPreferida = dirMezcladas[idx];
+        let colocada = false;
+
+        // Intentar cruce con palabras existentes primero
+        if (palabrasColocadas.length > 0) {
+          for (const prev of palabrasColocadas) {
+            if (colocada) break;
+            const dirIntento = prev.dir === "H" ? "V" : "H";
+            if (dirIntento !== dirPreferida) continue;
+            for (let i = 0; i < palabra.length; i++) {
+              if (colocada) break;
+              for (let j = 0; j < prev.palabra.length; j++) {
+                if (palabra[i] === prev.palabra[j]) {
+                  const f = dirIntento === "V" ? prev.fila - i : prev.fila + j;
+                  const c = dirIntento === "V" ? prev.col + j : prev.col - i;
+                  if (f >= 0 && c >= 0 && puedeColocar(palabra, f, c, dirIntento)) {
+                    for (let k = 0; k < palabra.length; k++) {
+                      const rf = dirIntento === "V" ? f + k : f;
+                      const rc = dirIntento === "H" ? c + k : c;
+                      grid[rf][rc] = palabra[k];
+                    }
+                    palabrasColocadas.push({
+                      num: idx + 1,
+                      palabra,
+                      pista: item.pista,
+                      fila: f,
+                      col: c,
+                      dir: dirIntento
+                    });
+                    colocada = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Si no cruzó, buscar posición libre en la cuadrícula respetando la dirección asignada
+        if (!colocada) {
+          const ordenFilas = barajarFisherYates(Array.from({ length: N }, (_, i) => i));
+          const ordenCols = barajarFisherYates(Array.from({ length: N }, (_, i) => i));
+          for (const f of ordenFilas) {
+            if (colocada) break;
+            for (const c of ordenCols) {
+              if (puedeColocar(palabra, f, c, dirPreferida)) {
+                for (let k = 0; k < palabra.length; k++) {
+                  const rf = dirPreferida === "V" ? f + k : f;
+                  const rc = dirPreferida === "H" ? c + k : c;
+                  grid[rf][rc] = palabra[k];
+                }
+                palabrasColocadas.push({
+                  num: idx + 1,
+                  palabra,
+                  pista: item.pista,
+                  fila: f,
+                  col: c,
+                  dir: dirPreferida
+                });
+                colocada = true;
+                break;
+              }
+            }
+          }
+        }
+
+        // Respaldo garantizado en caso de saturación
+        if (!colocada) {
+          const dirAlt = dirPreferida === "H" ? "V" : "H";
+          for (let f = 0; f < N && !colocada; f++) {
+            for (let c = 0; c < N && !colocada; c++) {
+              if (puedeColocar(palabra, f, c, dirAlt)) {
+                for (let k = 0; k < palabra.length; k++) {
+                  const rf = dirAlt === "V" ? f + k : f;
+                  const rc = dirAlt === "H" ? c + k : c;
+                  grid[rf][rc] = palabra[k];
+                }
+                palabrasColocadas.push({
+                  num: idx + 1,
+                  palabra,
+                  pista: item.pista,
+                  fila: f,
+                  col: c,
+                  dir: dirAlt
+                });
+                colocada = true;
+              }
+            }
+          }
+        }
+      });
+
+      return { N, palabras: palabrasColocadas };
+    }
+
+    function construirSopaDeLetras18x18(conceptosBarajados) {
+      const TAM = 18;
+      const candidatos = conceptosBarajados.filter(c => c.palabra.length <= 14).slice(0, 15);
+      const matriz = Array.from({ length: TAM }, () => Array(TAM).fill(""));
+      const ubicaciones = [];
+
+      candidatos.forEach((item, idx) => {
+        const palabra = item.palabra.toUpperCase();
+        const dirs = barajarFisherYates(["H", "V"]); // SOLO horizontal (izq-der) y vertical (arr-aba)
+        let puesta = false;
+
+        for (const dir of dirs) {
+          if (puesta) break;
+          const filasDisp = barajarFisherYates(
+            Array.from({ length: dir === "V" ? TAM - palabra.length + 1 : TAM }, (_, i) => i)
+          );
+          const colsDisp = barajarFisherYates(
+            Array.from({ length: dir === "H" ? TAM - palabra.length + 1 : TAM }, (_, i) => i)
+          );
+
+          for (const f of filasDisp) {
+            if (puesta) break;
+            for (const c of colsDisp) {
+              let valido = true;
+              for (let k = 0; k < palabra.length; k++) {
+                const rf = dir === "V" ? f + k : f;
+                const rc = dir === "H" ? c + k : c;
+                if (matriz[rf][rc] !== "" && matriz[rf][rc] !== palabra[k]) {
+                  valido = false;
+                  break;
+                }
+              }
+              if (valido) {
+                for (let k = 0; k < palabra.length; k++) {
+                  const rf = dir === "V" ? f + k : f;
+                  const rc = dir === "H" ? c + k : c;
+                  matriz[rf][rc] = palabra[k];
+                }
+                const fFin = dir === "V" ? f + palabra.length - 1 : f;
+                const cFin = dir === "H" ? c + palabra.length - 1 : c;
+                ubicaciones.push({
+                  id: idx + 1,
+                  palabra,
+                  pista: item.pista,
+                  fIni: f,
+                  cIni: c,
+                  fFin,
+                  cFin,
+                  dir
+                });
+                puesta = true;
+                break;
+              }
+            }
+          }
+        }
+      });
+
+      const alfabeto = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ";
+      for (let f = 0; f < TAM; f++) {
+        for (let c = 0; c < TAM; c++) {
+          if (matriz[f][c] === "") {
+            matriz[f][c] = alfabeto[Math.floor(Math.random() * alfabeto.length)];
+          }
+        }
+      }
+
+      return { TAM, matriz, palabrasSopa: ubicaciones };
+    }
+
+    const LogoSena = ({ className = "w-12 h-12" }) => (
+      <svg
+        version="1.1"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 50 50"
+        className={className}
+      >
+        <g transform="translate(-101.671 -608.712)">
+          <g transform="translate(101.671 608.712)">
+            <path
+              fillRule="evenodd"
+              clipRule="evenodd"
+              fill="#39A900"
+              d="M25.2,0.8c-3,0-5.4,2.4-5.4,5.4c0,3,2.4,5.4,5.4,5.4c3,0,5.4-2.4,5.4-5.4C30.6,3.2,28.2,0.8,25.2,0.8 C25.2,0.8,25.2,0.8,25.2,0.8z M32.2,13.3l0,5l-4.4-5h-4.1v7.3h3l0-4.8l4.2,4.8l4.2,0l0-7.3L32.2,13.3L32.2,13.3z M13.6,13.3 L13.6,13.3l-0.1,7.3l8.8,0l0-1.6l-5.6,0l0-1.4l5,0V16l-4.9,0.1V15l5.3,0l0-1.6L13.6,13.3L13.6,13.3z M44,13.3h-3.5l-5,7.3h3.2 l0.8-1.4l5.1,0l0.8,1.4h3.4L44,13.3z M7.7,13.3H7.1c-0.6,0-1.1,0-1.7,0.1c-0.7,0.1-1.4,0.3-2,0.6c-0.6,0.2-1,0.8-1,1.4 c0,0.3,0,0.5,0.2,0.8c0.1,0.1,0.1,0.2,0.2,0.3c0.5,0.4,1,0.7,1.7,0.8c0.8,0.2,1.6,0.4,2.4,0.5c0.5,0.1,1,0.2,1.5,0.3 c0.2,0.1,0.4,0.2,0.6,0.3c0.1,0.1,0.1,0.3,0,0.4c0,0,0,0,0,0C8.6,19,8.3,19.1,8,19.1c-0.5,0-1,0-1.5,0c-0.6-0.1-0.9-0.3-1-0.6 c0-0.1,0-0.2,0-0.2l0-0.2l-0.2,0c-0.1,0-0.8,0-1.6,0l-1.3,0v0.1c0,0.2,0,0.4,0.1,0.5c0.2,0.8,0.8,1.3,1.9,1.6 c0.5,0.1,1,0.2,1.5,0.2c0.5,0,1.5,0,2.1,0c2.3-0.1,3.8-0.6,4.3-1.5c0.1-0.2,0.2-0.5,0.2-0.7c0-0.3-0.1-0.6-0.3-0.9 c-0.3-0.4-0.7-0.7-1.2-0.8c-0.8-0.3-1.6-0.5-2.5-0.6c-0.7-0.1-1.4-0.2-2-0.4c-0.2-0.1-0.4-0.2-0.6-0.3c0-0.1,0-0.2,0-0.2 c0.1-0.2,0.5-0.3,1-0.4c0.4,0,0.8,0,1.2,0c0.3,0,0.6,0.1,0.8,0.3c0.1,0.1,0.1,0.2,0.2,0.3c0,0.1,0,0.1,0.1,0.1c0,0,0.7,0,1.5,0 l1.5,0l0-0.1c0-0.2,0-0.3-0.1-0.5c-0.2-0.8-1.1-1.3-2.7-1.5C8.7,13.3,8.2,13.3,7.7,13.3L7.7,13.3z M42,15.1l1.6,2.6l-3.2,0 L42,15.1z M23.2,22.1L0,22.2V26h7.5c7.2,0,7.5,0,7.7,0.1c0.3,0.2,0.5,0.5,0.5,0.8c0.1,0.6,0.2,0-5.6,10l-3.4,5.9l2.8,2.6 L23.2,22.1L23.2,22.1z M26.8,22.2l13.8,23.2l2.8-2.6l-3.5-5.9c-5.8-9.9-5.7-9.4-5.6-10c0-0.3,0.2-0.7,0.5-0.8 C35,26,35.3,26,42.5,26H50v-3.8L26.8,22.2L26.8,22.2z M24.9,26.2L12.4,47.5l3.3,1.5l7.1-12.2l1.2-2.1c0.2-0.3,0.3-0.4,0.9-0.4 c0.4,0,0.7,0.1,0.9,0.4l1.3,2.2l7.3,12.2l3.3-1.9L24.9,26.2L24.9,26.2z"
+            />
+          </g>
+        </g>
+      </svg>
+    );
+
+    function App() {
+      const [aprendizSeleccionado, setAprendizSeleccionado] = useState(null);
+      const [evaluacionIniciada, setEvaluacionIniciada] = useState(false);
+      const [evaluacionFinalizada, setEvaluacionFinalizada] = useState(false);
+      const [pestanaActiva, setPestanaActiva] = useState("crucigrama");
+      const [mostrarVideo, setMostrarVideo] = useState(false);
+      const [modalConfirmarEntrega, setModalConfirmarEntrega] = useState(false);
+
+      // Estados de los 4 módulos generados en tiempo de ejecución
+      const [datosCrucigrama, setDatosCrucigrama] = useState(null);
+      const [respuestasCrucigrama, setRespuestasCrucigrama] = useState({});
+
+      const [datosSopa, setDatosSopa] = useState(null);
+      const [primerClicSopa, setPrimerClicSopa] = useState(null);
+      const [palabrasEncontradasSopa, setPalabrasEncontradasSopa] = useState([]);
+
+      const [retosSeleccionados, setRetosSeleccionados] = useState([]);
+      const [respuestasRetos, setRespuestasRetos] = useState({});
+
+      const [preguntasSeleccionadas, setPreguntasSeleccionadas] = useState([]);
+      const [respuestasTest, setRespuestasTest] = useState({});
+
+      const [fechaEntrega, setFechaEntrega] = useState("");
+      const reporteRef = useRef(null);
+
+      // Prevención de recargas accidentales (beforeunload)
+      useEffect(() => {
+        const manejarBeforeUnload = (e) => {
+          if (evaluacionIniciada && !evaluacionFinalizada) {
+            e.preventDefault();
+            e.returnValue = "";
+          }
+        };
+        window.addEventListener("beforeunload", manejarBeforeUnload);
+        return () => window.removeEventListener("beforeunload", manejarBeforeUnload);
+      }, [evaluacionIniciada, evaluacionFinalizada]);
+
+      const iniciarEvaluacion = () => {
+        if (!aprendizSeleccionado) return;
+
+        // 1. Crucigrama: barajar los 45 conceptos en tiempo de ejecución y seleccionar 15
+        const conceptosParaCrucigrama = barajarFisherYates(bancoConceptos45);
+        const crucigramaGen = construirCrucigrama2D(conceptosParaCrucigrama);
+        setDatosCrucigrama(crucigramaGen);
+        setRespuestasCrucigrama({});
+
+        // 2. Sopa de Letras: barajar los 45 conceptos en tiempo de ejecución y seleccionar 15
+        const conceptosParaSopa = barajarFisherYates(bancoConceptos45);
+        const sopaGen = construirSopaDeLetras18x18(conceptosParaSopa);
+        setDatosSopa(sopaGen);
+        setPalabrasEncontradasSopa([]);
+        setPrimerClicSopa(null);
+
+        // 3. Caso Práctico: barajar los 60 retos dinámicos y seleccionar 15
+        const retosBarajados = barajarFisherYates(bancoRetos60).slice(0, 15);
+        setRetosSeleccionados(retosBarajados);
+        setRespuestasRetos({});
+
+        // 4. Test Teórico: barajar las 60 preguntas únicas y seleccionar 25, barajando también sus opciones
+        const preguntasBarajadas = barajarFisherYates(bancoPreguntas60)
+          .slice(0, 25)
+          .map((q) => ({
+            ...q,
+            opcionesMezcladas: barajarFisherYates(q.opciones)
+          }));
+        setPreguntasSeleccionadas(preguntasBarajadas);
+        setRespuestasTest({});
+
+        setEvaluacionIniciada(true);
+        setEvaluacionFinalizada(false);
+        setPestanaActiva("crucigrama");
+      };
+
+      const validarFormulaReto = (reto, entradaUsuario) => {
+        if (!entradaUsuario) return { esValida: false, detalle: "Sin respuesta registrada." };
+        const limpia = entradaUsuario.replace(/\s+/g, "").toUpperCase();
+
+        if (!limpia.startsWith("=BUSCARV(") && !limpia.startsWith("=CONSULTAV(")) {
+          return {
+            esValida: false,
+            detalle: "La fórmula debe iniciar con =BUSCARV( o =CONSULTAV(."
+          };
+        }
+        if (!limpia.endsWith(")")) {
+          return {
+            esValida: false,
+            detalle: "La fórmula debe cerrar con paréntesis ')'."
+          };
+        }
+        if (!limpia.includes(";")) {
+          return {
+            esValida: false,
+            detalle: "Los argumentos deben separarse obligatoriamente con punto y coma (;)."
+          };
+        }
+
+        const inicioArgs = limpia.indexOf("(") + 1;
+        const interior = limpia.slice(inicioArgs, -1);
+        const partes = interior.split(";");
+        if (partes.length !== 4) {
+          return {
+            esValida: false,
+            detalle: "La función requiere exactamente 4 argumentos separados por punto y coma (;)."
+          };
+        }
+
+        const [argValor, argMatriz, argCol, argOrden] = partes;
+        const valorLimpiado = argValor.replace(/\$/g, "");
+        if (valorLimpiado !== reto.celdaBuscada.toUpperCase()) {
+          return {
+            esValida: false,
+            detalle: `El primer argumento (valor_buscado) debe hacer referencia a la celda ${reto.celdaBuscada}.`
+          };
+        }
+
+        // Validación estricta de referencias absolutas ($) y hoja si aplica
+        const matrizSinComillas = argMatriz.replace(/'/g, "");
+        const matrizEsperada = reto.esHojaExterna
+          ? `${reto.hoja}!${reto.rangoAbsoluto}`
+          : reto.rangoAbsoluto;
+
+        if (!matrizSinComillas.includes("$")) {
+          return {
+            esValida: false,
+            detalle: "Es obligatorio fijar la matriz de búsqueda utilizando referencias absolutas ($)."
+          };
+        }
+
+        if (matrizSinComillas !== matrizEsperada) {
+          return {
+            esValida: false,
+            detalle: `La matriz de búsqueda con referencias absolutas debe ser ${matrizEsperada}.`
+          };
+        }
+
+        if (argCol !== reto.colIndicador) {
+          return {
+            esValida: false,
+            detalle: `El indicador de columnas debe ser ${reto.colIndicador}.`
+          };
+        }
+
+        if (!reto.validosOrden.includes(argOrden)) {
+          return {
+            esValida: false,
+            detalle: `El parámetro de ordenación debe ser ${reto.validosOrden.join(" o ")}.`
+          };
+        }
+
+        return { esValida: true, detalle: "Fórmula estructurada correctamente con referencias absolutas." };
+      };
+
+      const manejarClicCeldaSopa = (fila, col) => {
+        if (!primerClicSopa) {
+          setPrimerClicSopa({ fila, col });
+          return;
+        }
+
+        const f1 = primerClicSopa.fila;
+        const c1 = primerClicSopa.col;
+        const f2 = fila;
+        const c2 = col;
+
+        // Buscar si coincide con el inicio y fin (o viceversa) de alguna palabra de la sopa
+        const encontrada = datosSopa.palabrasSopa.find(
+          (p) =>
+            (p.fIni === f1 && p.cIni === c1 && p.fFin === f2 && p.cFin === c2) ||
+            (p.fIni === f2 && p.cIni === c2 && p.fFin === f1 && p.cFin === c1)
+        );
+
+        if (encontrada && !palabrasEncontradasSopa.includes(encontrada.palabra)) {
+          setPalabrasEncontradasSopa([...palabrasEncontradasSopa, encontrada.palabra]);
+        }
+        setPrimerClicSopa(null);
+      };
+
+      const calcularResultados = () => {
+        if (!datosCrucigrama || !datosSopa) {
+          return {
+            aciertosCrucigrama: 0,
+            notaCrucigrama: 0,
+            aciertosSopa: 0,
+            notaSopa: 0,
+            aciertosRetos: 0,
+            notaRetos: 0,
+            aciertosTest: 0,
+            notaTest: 0,
+            notaDefinitiva: 0
+          };
+        }
+
+        // 1. Crucigrama (15%) - Sanitización obligatoria .trim().toUpperCase() (Regla Anti-Error #6)
+        let aciertosCrucigrama = 0;
+        datosCrucigrama.palabras.forEach((item) => {
+          const respUsuario = (respuestasCrucigrama[item.num] || "").trim().toUpperCase();
+          if (respUsuario === item.palabra.trim().toUpperCase()) {
+            aciertosCrucigrama++;
+          }
+        });
+        const notaCrucigrama = (aciertosCrucigrama / 15) * 15;
+
+        // 2. Sopa de Letras (15%)
+        const aciertosSopa = palabrasEncontradasSopa.length;
+        const notaSopa = (aciertosSopa / 15) * 15;
+
+        // 3. Caso Práctico (35%)
+        let aciertosRetos = 0;
+        retosSeleccionados.forEach((reto) => {
+          const res = validarFormulaReto(reto, respuestasRetos[reto.id] || "");
+          if (res.esValida) aciertosRetos++;
+        });
+        const notaRetos = (aciertosRetos / 15) * 35;
+
+        // 4. Test Teórico (35%)
+        let aciertosTest = 0;
+        preguntasSeleccionadas.forEach((preg) => {
+          if (respuestasTest[preg.id] === preg.correcta) {
+            aciertosTest++;
+          }
+        });
+        const notaTest = (aciertosTest / 25) * 35;
+
+        const notaDefinitiva = notaCrucigrama + notaSopa + notaRetos + notaTest;
+
+        return {
+          aciertosCrucigrama,
+          notaCrucigrama,
+          aciertosSopa,
+          notaSopa,
+          aciertosRetos,
+          notaRetos,
+          aciertosTest,
+          notaTest,
+          notaDefinitiva
+        };
+      };
+
+      const confirmarFinalizacion = () => {
+        const ahora = new Date();
+        setFechaEntrega(ahora.toLocaleString("es-CO"));
+        setModalConfirmarEntrega(false);
+        setEvaluacionFinalizada(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      const descargarReportePDF = () => {
+        if (!reporteRef.current || !aprendizSeleccionado) return;
+        const elemento = reporteRef.current;
+        const opciones = {
+          margin: [10, 10, 10, 10],
+          filename: `Reporte_DUA_Interfaz_Excel_${aprendizSeleccionado.id}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        };
+        window.html2pdf().set(opciones).from(elemento).save();
+      };
+
+      const renderizarCuadriculaCrucigrama = () => {
+        if (!datosCrucigrama) return null;
+        const { N, palabras } = datosCrucigrama;
+
+        // Mapa de celdas activas y sus letras ingresadas desde el panel lateral
+        const celdasMapa = Array.from({ length: N }, () =>
+          Array.from({ length: N }, () => ({ activa: false, letraUsuario: "", numInicio: null }))
+        );
+
+        palabras.forEach((item) => {
+          const textoIngresado = (respuestasCrucigrama[item.num] || "").trim().toUpperCase();
+          for (let k = 0; k < item.palabra.length; k++) {
+            const rf = item.dir === "V" ? item.fila + k : item.fila;
+            const rc = item.dir === "H" ? item.col + k : item.col;
+            if (rf < N && rc < N) {
+              celdasMapa[rf][rc].activa = true;
+              if (textoIngresado[k]) {
+                celdasMapa[rf][rc].letraUsuario = textoIngresado[k];
+              }
+              // REGLA ANTI-ERROR #3: El número identificador se asigna ÚNICA Y EXCLUSIVAMENTE a la celda de inicio (k === 0)
+              if (k === 0) {
+                celdasMapa[rf][rc].numInicio = celdasMapa[rf][rc].numInicio
+                  ? `${celdasMapa[rf][rc].numInicio}/${item.num}`
+                  : `${item.num}`;
+              }
+            }
+          }
+        });
+
+        return (
+          <div
+            className="crossword-grid mx-auto overflow-auto shadow-inner"
+            style={{
+              gridTemplateColumns: `repeat(${N}, minmax(26px, 30px))`,
+              maxWidth: "100%"
+            }}
+          >
+            {celdasMapa.map((filaArr, fIdx) =>
+              filaArr.map((celda, cIdx) => {
+                if (!celda.activa) {
+                  return (
+                    <div
+                      key={`${fIdx}-${cIdx}`}
+                      className="w-7 h-7 bg-senaDarkBlue/90 rounded-[2px]"
+                    />
+                  );
+                }
+                // REGLA ANTI-ERROR #6: Uso estricto de contenedores de solo lectura (<div> y <span>) en la cuadrícula visual
+                return (
+                  <div
+                    key={`${fIdx}-${cIdx}`}
+                    className="w-7 h-7 bg-white border border-slate-400 relative flex items-center justify-center font-bold text-senaDarkBlue text-xs select-none"
+                  >
+                    {celda.numInicio && (
+                      <span className="absolute top-[1px] left-[2px] text-[8px] leading-none font-extrabold text-senaPurple">
+                        {celda.numInicio}
+                      </span>
+                    )}
+                    <span className="mt-1">{celda.letraUsuario}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      };
+
+      if (!evaluacionIniciada) {
+        return (
+          <div className="min-h-screen flex flex-col bg-slate-100">
+            <header className="bg-senaDarkBlue text-white shadow-lg border-b-4 border-senaGreen">
+              <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-white p-2 rounded-lg shadow">
+                    <LogoSena className="w-12 h-12" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+                      EVALUACIÓN INTERACTIVA DUA - INTERFAZ DE EXCEL
+                    </h1>
+                    <p className="text-xs md:text-sm text-slate-300">
+                      Diseño Universal para el Aprendizaje | Entorno de Evaluación Seguro
+                    </p>
+                  </div>
+                </div>
+                <span className="hidden md:inline-block bg-senaGreen text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">
+                  53 Aprendices Verificados
+                </span>
+              </div>
+            </header>
+
+            <main className="flex-grow flex items-center justify-center p-6">
+              <div className="bg-white max-w-2xl w-full rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-senaDarkGreen to-senaGrayGreen px-6 py-5 text-white">
+                  <h2 className="text-lg font-bold">Identificación del Aprendiz</h2>
+                  <p className="text-xs text-slate-100 mt-1">
+                    Seleccione el documento de identidad en el listado desplegable para autocompletar los datos de registro e iniciar la prueba.
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-senaDarkBlue mb-2">
+                      Seleccionar Aprendiz (Ordenado por Documento de Identidad - ID):
+                    </label>
+                    <select
+                      className="w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-senaGreen bg-white text-slate-800"
+                      value={aprendizSeleccionado ? aprendizSeleccionado.id : ""}
+                      onChange={(e) => {
+                        const encontrado = baseAprendices.find((a) => a.id === e.target.value);
+                        setAprendizSeleccionado(encontrado || null);
+                      }}
+                    >
+                      <option value="">-- Seleccione un número de identificación --</option>
+                      {baseAprendices.map((ap) => (
+                        <option key={ap.id} value={ap.id}>
+                          {ap.id} - {ap.nombres} {ap.apellidos} (Ficha {ap.ficha})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                        Número de Identificación (ID)
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={aprendizSeleccionado ? aprendizSeleccionado.id : ""}
+                        placeholder="Autocompletado..."
+                        className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 font-semibold cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                        Número de Ficha
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={aprendizSeleccionado ? aprendizSeleccionado.ficha : ""}
+                        placeholder="Autocompletado..."
+                        className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 font-semibold cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                        Nombres del Aprendiz
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={aprendizSeleccionado ? aprendizSeleccionado.nombres : ""}
+                        placeholder="Autocompletado..."
+                        className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 font-semibold cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                        Apellidos del Aprendiz
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={aprendizSeleccionado ? aprendizSeleccionado.apellidos : ""}
+                        placeholder="Autocompletado..."
+                        className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 font-semibold cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs text-slate-700 space-y-2">
+                    <div className="font-bold text-senaDarkBlue uppercase">
+                      Estructura y Ponderación de la Evaluación:
+                    </div>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <li className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-senaGreen"></span>
+                        <span><strong>Crucigrama 2D:</strong> 15 conceptos (15%)</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-senaPurple"></span>
+                        <span><strong>Sopa de Letras 18x18:</strong> 15 términos (15%)</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-senaDarkGreen"></span>
+                        <span><strong>Caso Práctico:</strong> 15 retos técnicos (35%)</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-senaDarkBlue"></span>
+                        <span><strong>Test Teórico:</strong> 25 preguntas únicas (35%)</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    disabled={!aprendizSeleccionado}
+                    onClick={iniciarEvaluacion}
+                    className={`w-full py-3 rounded-xl font-bold text-white shadow-md transition ${
+                      aprendizSeleccionado
+                        ? "bg-senaGreen hover:bg-senaDarkGreen cursor-pointer"
+                        : "bg-slate-300 cursor-not-allowed"
+                    }`}
+                  >
+                    Iniciar Evaluación Interactiva
+                  </button>
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      }
+
+      const resultados = calcularResultados();
+
+      if (evaluacionFinalizada) {
+        return (
+          <div className="min-h-screen bg-slate-100 py-8 px-4">
+            <div className="max-w-5xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 no-print">
+              <div className="flex items-center space-x-3">
+                <LogoSena className="w-10 h-10" />
+                <div>
+                  <h1 className="text-lg font-bold text-senaDarkBlue">
+                     Evaluación Finalizada - Reporte de Calificación
+                  </h1>
+                  <p className="text-xs text-slate-600">
+                    El aprendiz puede descargar el informe detallado en formato PDF.
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={descargarReportePDF}
+                  className="bg-senaGreen hover:bg-senaDarkGreen text-white font-bold px-5 py-2.5 rounded-xl shadow transition text-sm"
+                >
+                  Descargar Reporte en PDF
+                </button>
+                <button
+                  onClick={() => {
+                    setEvaluacionIniciada(false);
+                    setEvaluacionFinalizada(false);
+                    setAprendizSeleccionado(null);
+                  }}
+                  className="bg-senaDarkBlue hover:bg-slate-800 text-white font-semibold px-4 py-2.5 rounded-xl shadow transition text-sm"
+                >
+                  Salir al Inicio
+                </button>
+              </div>
+            </div>
+
+            <div
+              ref={reporteRef}
+              className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-8 space-y-6 text-slate-800"
+            >
+              <div className="flex items-center justify-between border-b-4 border-senaGreen pb-4">
+                <div className="flex items-center space-x-4">
+                  <LogoSena className="w-14 h-14" />
+                  <div>
+                    <h2 className="text-xl font-extrabold text-senaDarkBlue">
+                      REPORTE OFICIAL DE EVALUACIÓN DUA
+                    </h2>
+                    <p className="text-sm font-semibold text-senaDarkGreen">
+                      Tema Central: Interfaz de Excel
+                    </p>
+                    <p className="text-xs text-slate-500">Fecha de generación: {fechaEntrega}</p>
+                  </div>
+                </div>
+                <div className="text-right bg-senaDarkBlue text-white px-5 py-3 rounded-xl">
+                  <div className="text-xs uppercase tracking-wider text-slate-300">
+                    Calificación Final
+                  </div>
+                  <div className="text-3xl font-extrabold text-senaGreen">
+                    {resultados.notaDefinitiva.toFixed(2)} / 100
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-slate-500 block uppercase font-bold">Identificación (ID)</span>
+                  <span className="text-sm font-bold text-senaDarkBlue">{aprendizSeleccionado.id}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase font-bold">Nombres</span>
+                  <span className="text-sm font-bold text-senaDarkBlue">{aprendizSeleccionado.nombres}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase font-bold">Apellidos</span>
+                  <span className="text-sm font-bold text-senaDarkBlue">{aprendizSeleccionado.apellidos}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase font-bold">Ficha</span>
+                  <span className="text-sm font-bold text-senaPurple">{aprendizSeleccionado.ficha}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl border-l-4 border-senaGreen bg-slate-50">
+                  <div className="text-xs font-bold text-slate-500 uppercase">1. Crucigrama (15%)</div>
+                  <div className="text-xl font-extrabold text-senaDarkBlue mt-1">
+                    {resultados.notaCrucigrama.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    Aciertos: {resultados.aciertosCrucigrama} de 15
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border-l-4 border-senaPurple bg-slate-50">
+                  <div className="text-xs font-bold text-slate-500 uppercase">2. Sopa de Letras (15%)</div>
+                  <div className="text-xl font-extrabold text-senaDarkBlue mt-1">
+                    {resultados.notaSopa.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    Encontradas: {resultados.aciertosSopa} de 15
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border-l-4 border-senaDarkGreen bg-slate-50">
+                  <div className="text-xs font-bold text-slate-500 uppercase">3. Caso Práctico (35%)</div>
+                  <div className="text-xl font-extrabold text-senaDarkBlue mt-1">
+                    {resultados.notaRetos.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    Retos válidos: {resultados.aciertosRetos} de 15
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border-l-4 border-senaDarkBlue bg-slate-50">
+                  <div className="text-xs font-bold text-slate-500 uppercase">4. Test Teórico (35%)</div>
+                  <div className="text-xl font-extrabold text-senaDarkBlue mt-1">
+                    {resultados.notaTest.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-slate-600">
+                    Respuestas correctas: {resultados.aciertosTest} de 25
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold uppercase text-senaDarkBlue border-b pb-1">
+                  Resumen de Crucigrama (15 Conceptos Evaluados)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                  {datosCrucigrama.palabras.map((p) => {
+                    const resp = (respuestasCrucigrama[p.num] || "").trim().toUpperCase();
+                    const ok = resp === p.palabra.trim().toUpperCase();
+                    return (
+                      <div
+                        key={p.num}
+                        className={`p-2 rounded border ${
+                          ok ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
+                        }`}
+                      >
+                        <span className="font-bold">#{p.num} ({p.dir}): </span>
+                        <span> Aprendiz: {resp || "(Vacío)"} | </span>
+                        <span className="font-semibold text-senaDarkGreen">Clave: {p.palabra}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold uppercase text-senaDarkBlue border-b pb-1">
+                  Resumen de Caso Práctico (15 Retos Evaluados)
+                </h3>
+                <div className="space-y-2 text-xs">
+                  {retosSeleccionados.map((r, idx) => {
+                    const usr = respuestasRetos[r.id] || "";
+                    const val = validarFormulaReto(r, usr);
+                    return (
+                      <div
+                        key={r.id}
+                        className={`p-2.5 rounded border ${
+                          val.esValida ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
+                        }`}
+                      >
+                        <div className="font-semibold text-slate-800">
+                          Reto {idx + 1}: {r.enunciado}
+                        </div>
+                        <div className="mt-1">
+                          <strong>Respuesta registrada:</strong>{" "}
+                          <code className="bg-white px-1.5 py-0.5 rounded border">
+                            {usr || "(Sin respuesta)"}
+                          </code>{" "}
+                          | <strong>Solución esperada:</strong>{" "}
+                          <code className="bg-white px-1.5 py-0.5 rounded border text-senaDarkGreen">
+                            {r.solucionMuestra}
+                          </code>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-100">
+          <header className="bg-senaDarkBlue text-white shadow-md border-b-4 border-senaGreen sticky top-0 z-30">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="bg-white p-1.5 rounded-lg">
+                  <LogoSena className="w-9 h-9" />
+                </div>
+                <div>
+                  <h1 className="text-base md:text-lg font-bold leading-tight">
+                    EVALUACIÓN DUA: INTERFAZ DE EXCEL
+                  </h1>
+                  <p className="text-xs text-slate-300">
+                    Aprendiz: <strong>{aprendizSeleccionado.nombres} {aprendizSeleccionado.apellidos}</strong> | ID: <strong>{aprendizSeleccionado.id}</strong> | Ficha: <strong>{aprendizSeleccionado.ficha}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setMostrarVideo(!mostrarVideo)}
+                  className="bg-senaPurple hover:bg-purple-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow transition"
+                >
+                  {mostrarVideo ? "Ocultar Recurso Audiovisual" : "Ver Video de Apoyo DUA"}
+                </button>
+                <button
+                  onClick={() => setModalConfirmarEntrega(true)}
+                  className="bg-senaGreen hover:bg-senaDarkGreen text-white text-xs font-bold px-4 py-2 rounded-lg shadow transition"
+                >
+                  Finalizar y Calificar Evaluación
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 border-t border-slate-700">
+              <div className="max-w-7xl mx-auto px-4 flex overflow-x-auto space-x-2 py-2">
+                <button
+                  onClick={() => setPestanaActiva("crucigrama")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                    pestanaActiva === "crucigrama"
+                      ? "bg-senaGreen text-white shadow"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  1. Crucigrama 2D (15%)
+                </button>
+                <button
+                  onClick={() => setPestanaActiva("sopa")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                    pestanaActiva === "sopa"
+                      ? "bg-senaGreen text-white shadow"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  2. Sopa de Letras 18x18 (15%) - [{palabrasEncontradasSopa.length}/15]
+                </button>
+                <button
+                  onClick={() => setPestanaActiva("casos")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                    pestanaActiva === "casos"
+                      ? "bg-senaGreen text-white shadow"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  3. Caso Práctico (35%) - [{Object.keys(respuestasRetos).filter(k => (respuestasRetos[k] || "").trim() !== "").length}/15]
+                </button>
+                <button
+                  onClick={() => setPestanaActiva("test")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                    pestanaActiva === "test"
+                      ? "bg-senaGreen text-white shadow"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  4. Test Teórico (35%) - [{Object.keys(respuestasTest).length}/25]
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {mostrarVideo && (
+            <div className="bg-slate-900 text-white py-4 px-4 border-b border-slate-700">
+              <div className="max-w-4xl mx-auto space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase text-senaGreen">
+                    Material Audiovisual de Apoyo (Diseño Universal para el Aprendizaje)
+                  </span>
+                  <a
+                    href="https://www.youtube.com/watch?v=PAhm2LyzZc4"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline text-slate-300 hover:text-white"
+                  >
+                    Abrir enlace directo en YouTube
+                  </a>
+                </div>
+                <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-700 bg-black">
+                  <iframe
+                    className="w-full h-full"
+                    src="https://www.youtube.com/embed/PAhm2LyzZc4"
+                    title="Recurso Audiovisual Interfaz de Excel"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {}
+          <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6">
+            {pestanaActiva === "crucigrama" && datosCrucigrama && (
+              <div className="space-y-6">
+                <div className="bg-white p-5 rounded-2xl shadow border border-slate-200">
+                  <h2 className="text-lg font-bold text-senaDarkBlue">
+                    Módulo 1: Crucigrama de Conceptos de la Interfaz de Excel (Ponderación: 15%)
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Lea las 15 pistas seleccionadas al azar en el panel derecho y digite la palabra correspondiente en cada campo de captura. La cuadrícula de la izquierda reflejará automáticamente las letras en modo de solo lectura.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="lg:col-span-7 bg-white p-4 rounded-2xl shadow border border-slate-200 overflow-x-auto">
+                    {renderizarCuadriculaCrucigrama()}
+                  </div>
+
+                  <div className="lg:col-span-5 bg-white p-5 rounded-2xl shadow border border-slate-200 max-h-[680px] overflow-y-auto space-y-4">
+                    <h3 className="text-sm font-bold uppercase text-senaDarkGreen border-b pb-2">
+                      Panel de Pistas y Captura Sincronizada (15 Conceptos)
+                    </h3>
+                    {datosCrucigrama.palabras.map((item) => {
+                      const actual = (respuestasCrucigrama[item.num] || "").trim().toUpperCase();
+                      const longitudCompleta = actual.length === item.palabra.length;
+                      return (
+                        <div
+                          key={item.num}
+                          className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold text-senaPurple uppercase">
+                              #{item.num} - {item.dir === "H" ? "Horizontal" : "Vertical"} ({item.palabra.length} letras)
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                                longitudCompleta
+                                  ? "bg-senaGreen/20 text-senaDarkGreen"
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {actual.length}/{item.palabra.length}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700">{item.pista}</p>
+                          <input
+                            type="text"
+                            maxLength={item.palabra.length}
+                            value={respuestasCrucigrama[item.num] || ""}
+                            onChange={(e) =>
+                              setRespuestasCrucigrama({
+                                ...respuestasCrucigrama,
+                                [item.num]: e.target.value.toUpperCase()
+                              })
+                            }
+                            placeholder={`Digite término de ${item.palabra.length} letras...`}
+                            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-senaGreen"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pestanaActiva === "sopa" && datosSopa && (
+              <div className="space-y-6">
+                <div className="bg-white p-5 rounded-2xl shadow border border-slate-200">
+                  <h2 className="text-lg font-bold text-senaDarkBlue">
+                    Módulo 2: Sopa de Letras Accesible 18x18 (Ponderación: 15%)
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Las palabras se ubican únicamente en sentido horizontal (de izquierda a derecha) y vertical (de arriba hacia abajo). Utilice el método de <strong>Dos Clics</strong>: haga un primer clic sobre la letra inicial de la palabra y un segundo clic sobre su letra final.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="lg:col-span-7 bg-white p-5 rounded-2xl shadow border border-slate-200 overflow-x-auto">
+                    <div
+                      className="grid gap-1 mx-auto"
+                      style={{
+                        gridTemplateColumns: `repeat(${datosSopa.TAM}, minmax(26px, 32px))`,
+                        width: "fit-content"
+                      }}
+                    >
+                      {datosSopa.matriz.map((filaArr, fIdx) =>
+                        filaArr.map((letra, cIdx) => {
+                          const esPrimerClic =
+                            primerClicSopa &&
+                            primerClicSopa.fila === fIdx &&
+                            primerClicSopa.col === cIdx;
+
+                          // Verificar si la celda pertenece a alguna palabra ya encontrada
+                          const perteneceEncontrada = datosSopa.palabrasSopa.some((p) => {
+                            if (!palabrasEncontradasSopa.includes(p.palabra)) return false;
+                            if (p.dir === "H") {
+                              return fIdx === p.fIni && cIdx >= p.cIni && cIdx <= p.cFin;
+                            } else {
+                              return cIdx === p.cIni && fIdx >= p.fIni && fIdx <= p.fFin;
+                            }
+                          });
+
+                          return (
+                            <button
+                              key={`${fIdx}-${cIdx}`}
+                              type="button"
+                              onClick={() => manejarClicCeldaSopa(fIdx, cIdx)}
+                              className={`w-7 h-7 sm:w-8 sm:h-8 rounded font-bold text-xs flex items-center justify-center border transition ${
+                                esPrimerClic
+                                  ? "bg-senaPurple text-white border-senaPurple scale-105 shadow"
+                                  : perteneceEncontrada
+                                  ? "bg-senaGreen text-white border-senaDarkGreen"
+                                  : "bg-slate-50 text-senaDarkBlue border-slate-300 hover:bg-slate-200"
+                              }`}
+                            >
+                              {letra}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* REGLA ANTI-ERROR #2: Listado de palabras 100% visible desde el inicio sin enmascarar */}
+                  <div className="lg:col-span-5 bg-white p-5 rounded-2xl shadow border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-sm font-bold uppercase text-senaDarkGreen">
+                        Palabras a Buscar (100% Visibles)
+                      </h3>
+                      <span className="text-xs font-bold bg-senaDarkBlue text-white px-2.5 py-1 rounded-full">
+                        {palabrasEncontradasSopa.length} / 15 Encontradas
+                      </span>
+                    </div>
+                    <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                      {datosSopa.palabrasSopa.map((item) => {
+                        const hallada = palabrasEncontradasSopa.includes(item.palabra);
+                        return (
+                          <div
+                            key={item.id}
+                            className={`p-3 rounded-xl border transition ${
+                              hallada
+                                ? "bg-green-50 border-senaGreen"
+                                : "bg-slate-50 border-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={`text-sm font-extrabold tracking-wide ${
+                                  hallada ? "text-senaDarkGreen line-through" : "text-senaDarkBlue"
+                                }`}
+                              >
+                                {item.palabra}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                                  hallada
+                                    ? "bg-senaGreen text-white"
+                                    : "bg-slate-200 text-slate-700"
+                                }`}
+                              >
+                                {hallada ? "Localizada" : "Pendiente"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1">{item.pista}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {}
+            {pestanaActiva === "casos" && (
+              <div className="space-y-6">
+                <div className="bg-white p-5 rounded-2xl shadow border border-slate-200">
+                  <h2 className="text-lg font-bold text-senaDarkBlue">
+                    Módulo 3: Caso Práctico en el Cuadro de Entrada de Fórmulas (Ponderación: 35%)
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Resuelva los 15 retos seleccionados al azar del banco de 60 casos dinámicos. Utilice el signo igual (<code>=</code>), separe los argumentos con punto y coma (<code>;</code>) y fije obligatoriamente el rango de la matriz de búsqueda mediante referencias absolutas (<code>$</code>).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {retosSeleccionados.map((reto, index) => {
+                    const valorActual = respuestasRetos[reto.id] || "";
+                    return (
+                      <div
+                        key={reto.id}
+                        className="bg-white p-5 rounded-2xl shadow border border-slate-200 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold uppercase bg-senaDarkBlue text-white px-3 py-1 rounded-full">
+                            Reto Técnico #{index + 1} de 15
+                          </span>
+                          <span className="text-xs font-semibold text-senaGrayGreen">
+                            {reto.esHojaExterna ? `Búsqueda en hoja externa (${reto.hoja})` : "Búsqueda en hoja activa"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-800 leading-relaxed">{reto.enunciado}</p>
+                        <div className="flex items-center space-x-2 bg-slate-100 p-2 rounded-xl border border-slate-300">
+                          <span className="px-2.5 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-senaDarkBlue select-none">
+                            fx
+                          </span>
+                          <input
+                            type="text"
+                            value={valorActual}
+                            onChange={(e) =>
+                              setRespuestasRetos({
+                                ...respuestasRetos,
+                                [reto.id]: e.target.value
+                              })
+                            }
+                            placeholder="Ejemplo: =BUSCARV(A2;Hoja!$A$2:$F$85;3;FALSO)"
+                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-senaGreen"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {pestanaActiva === "test" && (
+              <div className="space-y-6">
+                <div className="bg-white p-5 rounded-2xl shadow border border-slate-200">
+                  <h2 className="text-lg font-bold text-senaDarkBlue">
+                    Módulo 4: Test Teórico sobre la Interfaz de Excel (Ponderación: 35%)
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Seleccione la respuesta correcta para cada una de las 25 preguntas seleccionadas aleatoriamente del banco maestro de 60 preguntas únicas basadas en el marco teórico.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {preguntasSeleccionadas.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="bg-white p-5 rounded-2xl shadow border border-slate-200 space-y-3"
+                    >
+                      <div className="flex items-start space-x-3">
+                        <span className="bg-senaPurple text-white text-xs font-extrabold px-2.5 py-1 rounded-lg shrink-0">
+                          Pregunta {idx + 1}
+                        </span>
+                        <h3 className="text-sm font-bold text-senaDarkBlue leading-snug">
+                          {item.pregunta}
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 pt-1">
+                        {item.opcionesMezcladas.map((opcion, oIdx) => {
+                          const marcada = respuestasTest[item.id] === opcion;
+                          return (
+                            <label
+                              key={oIdx}
+                              onClick={() =>
+                                setRespuestasTest({
+                                  ...respuestasTest,
+                                  [item.id]: opcion
+                                })
+                              }
+                              className={`flex items-center space-x-3 p-3 rounded-xl border text-xs cursor-pointer transition ${
+                                marcada
+                                  ? "bg-senaGreen/15 border-senaGreen font-bold text-senaDarkBlue"
+                                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`pregunta_${item.id}`}
+                                checked={marcada}
+                                onChange={() => {}}
+                                className="accent-senaGreen"
+                              />
+                              <span>{opcion}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Modal personalizado de confirmación (sin usar alert/confirm nativos) */}
+          {modalConfirmarEntrega && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+              <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4">
+                <h3 className="text-lg font-bold text-senaDarkBlue">
+                  Confirmar Entrega de Evaluación
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  ¿Está seguro de finalizar y calificar la evaluación sobre la Interfaz de Excel? Una vez confirmada la entrega, se generará el reporte oficial de calificación listo para descargar en PDF.
+                </p>
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    onClick={() => setModalConfirmarEntrega(false)}
+                    className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-200 text-slate-700 hover:bg-slate-300"
+                  >
+                    Continuar Respondiendo
+                  </button>
+                  <button
+                    onClick={confirmarFinalizacion}
+                    className="px-4 py-2 rounded-lg text-xs font-bold bg-senaGreen text-white hover:bg-senaDarkGreen shadow"
+                  >
+                    Confirmar y Calificar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
